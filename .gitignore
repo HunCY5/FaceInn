@@ -1,0 +1,78 @@
+# ----------------------------------------
+# macOS
+# ----------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# ----------------------------------------
+# Xcode
+# ----------------------------------------
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xccheckout
+*.xcscmblueprint
+*.moved-aside
+xcuserdata/
+DerivedData/
+build/
+
+# ❌ Tuist를 사용할 경우 Xcode 프로젝트 파일은 Git에 포함하지 않음
+*.xcodeproj
+*.xcworkspace
+
+# ----------------------------------------
+# Tuist
+# ----------------------------------------
+Tuist/.build/
+.tuist-cache/
+.graph.dot
+Derived/
+
+# ----------------------------------------
+# Swift Package Manager
+# ----------------------------------------
+.build/
+.swiftpm/
+Package.resolved
+Package.pins
+Packages/
+
+# ----------------------------------------
+# CocoaPods
+# ----------------------------------------
+Pods/
+
+# ----------------------------------------
+# Carthage
+# ----------------------------------------
+Carthage/Build/
+
+# ----------------------------------------
+# fastlane
+# ----------------------------------------
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output/
+
+# ----------------------------------------
+# Misc
+# ----------------------------------------
+.DS_Store
