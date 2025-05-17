@@ -76,3 +76,6 @@ fastlane/test_output/
 # Misc
 # ----------------------------------------
 .DS_Store
+
+# Firebase
+**/GoogleService-Info.plist
