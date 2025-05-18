@@ -24,9 +24,10 @@ final class HomeViewController: UIViewController {
         let locationButton = UIButton(type: .system)
         locationButton.setTitle("📍 Location", for: .normal)
         locationButton.contentHorizontalAlignment = .left
+        locationButton.tintColor = .black
         locationButton.layer.cornerRadius = 8
         locationButton.layer.borderWidth = 1
-        locationButton.layer.borderColor = UIColor.systemGray4.cgColor
+        locationButton.layer.borderColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1).cgColor
         locationButton.backgroundColor = .white
         locationButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
         locationButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
@@ -34,9 +35,10 @@ final class HomeViewController: UIViewController {
         let dateButton = UIButton(type: .system)
         dateButton.setTitle("📅 Dates", for: .normal)
         dateButton.contentHorizontalAlignment = .left
+        dateButton.tintColor = .black
         dateButton.layer.cornerRadius = 8
         dateButton.layer.borderWidth = 1
-        dateButton.layer.borderColor = UIColor.systemGray4.cgColor
+        dateButton.layer.borderColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1).cgColor
         dateButton.backgroundColor = .white
         dateButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
         dateButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
@@ -44,12 +46,15 @@ final class HomeViewController: UIViewController {
         let guestButton = UIButton(type: .system)
         guestButton.setTitle("👥 Guests", for: .normal)
         guestButton.contentHorizontalAlignment = .left
+        guestButton.tintColor = .black
         guestButton.layer.cornerRadius = 8
         guestButton.layer.borderWidth = 1
-        guestButton.layer.borderColor = UIColor.systemGray4.cgColor
+        guestButton.layer.borderColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1).cgColor
         guestButton.backgroundColor = .white
         guestButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
         guestButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        guestButton.addTarget(self, action: #selector(guestButtonTapped(_:)), for: .touchUpInside)
+        
 
         let stack = UIStackView(arrangedSubviews: [locationButton, dateButton, guestButton])
         stack.axis = .horizontal
@@ -75,6 +80,23 @@ final class HomeViewController: UIViewController {
         setupLayout()
         setupCollectionView()
         fetchAccommodations()
+    }
+
+    @objc private func guestButtonTapped(_ sender: UIButton) {
+        let vc = GuestSelectorViewController()
+        vc.modalPresentationStyle = .popover
+        vc.preferredContentSize = CGSize(width: 220, height: 160)
+        vc.onGuestsSelected = { [weak self] adults, children in
+            sender.setTitle("👥 \(adults + children) Guests", for: .normal)
+        }
+
+        if let popover = vc.popoverPresentationController {
+            popover.sourceView = sender
+            popover.sourceRect = sender.bounds
+            popover.permittedArrowDirections = .up
+            popover.delegate = self
+        }
+        present(vc, animated: true)
     }
 
     private func setupLayout() {
@@ -141,5 +163,11 @@ extension HomeViewController: UICollectionViewDataSource {
         }
         cell.configure(with: accommodations[indexPath.item])
         return cell
+    }
+}
+
+extension HomeViewController: UIPopoverPresentationControllerDelegate {
+    func adaptivePresentationStyle(for controller: UIPresentationController) -> UIModalPresentationStyle {
+        return .none
     }
 }

@@ -59,7 +59,7 @@ final class AccommodationCardView: UIView {
 
         viewDetailButton.setTitle("View Details", for: .normal)
         viewDetailButton.setTitleColor(.white, for: .normal)
-        viewDetailButton.backgroundColor = .systemBlue
+        viewDetailButton.backgroundColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
         viewDetailButton.titleLabel?.font = .systemFont(ofSize: 13)
         viewDetailButton.layer.cornerRadius = 6
         addSubview(viewDetailButton)
