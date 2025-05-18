@@ -7,29 +7,55 @@
 
 import UIKit
 import FirebaseFirestore
+import FirebaseStorage
 
 final class HomeViewController: UIViewController {
 
     private let searchBar: UISearchBar = {
         let sb = UISearchBar()
-        sb.placeholder = "숙소 이름 검색"
+        sb.placeholder = "Search destinations, hotels..."
+        sb.searchBarStyle = .minimal
+        sb.backgroundImage = UIImage() // remove border
+        sb.translatesAutoresizingMaskIntoConstraints = false
         return sb
     }()
 
     private let filterStackView: UIStackView = {
         let locationButton = UIButton(type: .system)
-        locationButton.setTitle("지역 선택", for: .normal)
+        locationButton.setTitle("📍 Location", for: .normal)
+        locationButton.contentHorizontalAlignment = .left
+        locationButton.layer.cornerRadius = 8
+        locationButton.layer.borderWidth = 1
+        locationButton.layer.borderColor = UIColor.systemGray4.cgColor
+        locationButton.backgroundColor = .white
+        locationButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
+        locationButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
 
         let dateButton = UIButton(type: .system)
-        dateButton.setTitle("날짜 선택", for: .normal)
+        dateButton.setTitle("📅 Dates", for: .normal)
+        dateButton.contentHorizontalAlignment = .left
+        dateButton.layer.cornerRadius = 8
+        dateButton.layer.borderWidth = 1
+        dateButton.layer.borderColor = UIColor.systemGray4.cgColor
+        dateButton.backgroundColor = .white
+        dateButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
+        dateButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
 
         let guestButton = UIButton(type: .system)
-        guestButton.setTitle("인원 선택", for: .normal)
+        guestButton.setTitle("👥 Guests", for: .normal)
+        guestButton.contentHorizontalAlignment = .left
+        guestButton.layer.cornerRadius = 8
+        guestButton.layer.borderWidth = 1
+        guestButton.layer.borderColor = UIColor.systemGray4.cgColor
+        guestButton.backgroundColor = .white
+        guestButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
+        guestButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
 
         let stack = UIStackView(arrangedSubviews: [locationButton, dateButton, guestButton])
         stack.axis = .horizontal
         stack.distribution = .fillEqually
         stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
         return stack
     }()
 
@@ -46,33 +72,19 @@ final class HomeViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-//        #if DEBUG
-//        let docRef = Firestore.firestore().collection("accommodations").document("shilla_copy")
-//        docRef.getDocument { snapshot, error in
-//            if let snapshot = snapshot, !snapshot.exists {
-//                AccommodationSeeder.seedShillaHotel()
-//            } else {
-//                print("✅ 'shilla' 문서가 이미 존재하므로 시드 생략")
-//            }
-//        }
-//        // Insert a copy with a different document ID just after seeding 'shilla'
-//        let docRef2 = Firestore.firestore().collection("accommodations").document("shilla_copy")
-//        docRef2.getDocument { snapshot, error in
-//            if let snapshot = snapshot, !snapshot.exists {
-//                AccommodationSeeder.seedShillaHotel(docId: "shilla_copy")
-//            }
-//        }
-//        #endif
-//        view.backgroundColor = .systemBackground
         setupLayout()
         setupCollectionView()
         fetchAccommodations()
     }
 
     private func setupLayout() {
+        view.backgroundColor = .systemBackground
+
         let topStack = UIStackView(arrangedSubviews: [searchBar, filterStackView])
         topStack.axis = .vertical
-        topStack.spacing = 12
+        topStack.spacing = 6
+        topStack.translatesAutoresizingMaskIntoConstraints = false
+
         view.addSubview(topStack)
         view.addSubview(collectionView)
 
@@ -80,14 +92,14 @@ final class HomeViewController: UIViewController {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
-            topStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            topStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
             topStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             topStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
 
             collectionView.topAnchor.constraint(equalTo: topStack.bottomAnchor, constant: 16),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            collectionView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
         ])
     }
 

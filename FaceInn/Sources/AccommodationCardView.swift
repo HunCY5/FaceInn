@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import FirebaseStorage
 
 final class AccommodationCardView: UIView {
 
@@ -17,6 +18,8 @@ final class AccommodationCardView: UIView {
     let viewDetailButton = UIButton()
     let heartButton = UIButton()
 
+    private var isLiked = false
+    
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupViews()
@@ -64,7 +67,15 @@ final class AccommodationCardView: UIView {
         heartButton.setImage(UIImage(systemName: "heart"), for: .normal)
         heartButton.tintColor = .gray
         addSubview(heartButton)
+        
+        heartButton.addTarget(self, action: #selector(heartButtonTapped), for: .touchUpInside)
     }
+    @objc private func heartButtonTapped() {
+           isLiked.toggle()
+           let heartImageName = isLiked ? "heart.fill" : "heart"
+           heartButton.setImage(UIImage(systemName: heartImageName), for: .normal)
+           heartButton.tintColor = isLiked ? .systemRed : .gray
+       }
 
     private func setupLayout() {
         [imageView, nameLabel, locationLabel, priceLabel, ratingLabel, viewDetailButton, heartButton].forEach {
@@ -105,7 +116,22 @@ final class AccommodationCardView: UIView {
         nameLabel.text = model.name
         locationLabel.text = model.location
         priceLabel.text = "₩\(model.price) / night"
-        ratingLabel.text = "⭐️ \(model.rating)"
+        let star = "⭐️ "
+        let ratingString = String(format: "%.1f", model.rating)
+        let reviewString = " (\(model.reviewCount))"
+
+        // NSMutableAttributedString 생성
+        let fullText = NSMutableAttributedString(string: star, attributes: [
+            .foregroundColor: UIColor.systemOrange
+        ])
+        fullText.append(NSAttributedString(string: ratingString, attributes: [
+            .foregroundColor: UIColor.black
+        ]))
+        fullText.append(NSAttributedString(string: reviewString, attributes: [
+            .foregroundColor: UIColor.gray
+        ]))
+
+        ratingLabel.attributedText = fullText
 
         if let urlString = model.imageURLs?.first, let url = URL(string: urlString) {
             print("📸 이미지 URL 시도: \(urlString)")

@@ -7,6 +7,7 @@
 
 import UIKit
 import FirebaseFirestore
+import FirebaseStorage
 
 struct AccommodationSeeder {
     static func seedShillaHotel(docId: String = "shilla") {
