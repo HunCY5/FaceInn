@@ -22,19 +22,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     ) -> Bool {
         // Firebase 초기화
         FirebaseApp.configure()
-        
         if FirebaseApp.app() != nil {
             print("configure 호출 성공")
         } else {
             print("configure 호출 실패")
         }
-        
         // Analytics 이벤트 로깅
         Analytics.logEvent("app_launch", parameters: [
             "platform": "iOS",
             "timestamp": "\(Date())"
         ])
-        
         // 익명 로그인 테스트 (Auth)
         Auth.auth().signInAnonymously { result, error in
             if let error = error {
