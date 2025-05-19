@@ -74,6 +74,7 @@ final class HomeViewController: UIViewController {
     }()
 
     private var accommodations: [Accommodation] = []
+    private var filteredAccommodations: [Accommodation] = []
 
     private let collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -88,6 +89,7 @@ final class HomeViewController: UIViewController {
         super.viewDidLoad()
         setupLayout()
         setupCollectionView()
+        searchBar.delegate = self
         fetchAccommodations()
         if let dateButton = filterStackView.arrangedSubviews[1] as? UIButton {
             dateButton.addTarget(self, action: #selector(dateButtonTapped(_:)), for: .touchUpInside)
@@ -201,6 +203,7 @@ final class HomeViewController: UIViewController {
                     imageURLs: data["imageURLs"] as? [String]
                 )
             }
+            self.filteredAccommodations = self.accommodations
             DispatchQueue.main.async {
                 self.collectionView.reloadData()
             }
@@ -210,14 +213,14 @@ final class HomeViewController: UIViewController {
 
 extension HomeViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return accommodations.count
+        return filteredAccommodations.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: AccommodationCell.identifier, for: indexPath) as? AccommodationCell else {
             return UICollectionViewCell()
         }
-        cell.configure(with: accommodations[indexPath.item])
+        cell.configure(with: filteredAccommodations[indexPath.item])
         return cell
     }
 }
@@ -225,5 +228,19 @@ extension HomeViewController: UICollectionViewDataSource {
 extension HomeViewController: UIPopoverPresentationControllerDelegate {
     func adaptivePresentationStyle(for controller: UIPresentationController) -> UIModalPresentationStyle {
         return .none
+    }
+}
+
+extension HomeViewController: UISearchBarDelegate {
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchText.isEmpty {
+            filteredAccommodations = accommodations
+        } else {
+            filteredAccommodations = accommodations.filter {
+                $0.name.localizedCaseInsensitiveContains(searchText) ||
+                $0.location.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        collectionView.reloadData()
     }
 }
