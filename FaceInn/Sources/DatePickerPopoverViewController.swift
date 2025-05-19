@@ -59,9 +59,6 @@ final class DatePickerPopoverViewController: UIViewController, FSCalendarDelegat
 
     func calendar(_ calendar: FSCalendar, didSelect date: Date, at monthPosition: FSCalendarMonthPosition) {
         hasUserInteracted = true
-        
-        // Clear default selection if user interacts first time with different date
-        if let start = startDate, let end = endDate, !Calendar.current.isDate(date, inSameDayAs: start), !Calendar.current.isDate(date, inSameDayAs: end) {
 
         if let start = startDate, let end = endDate {
             // 무조건 초기화 후 다시 선택
