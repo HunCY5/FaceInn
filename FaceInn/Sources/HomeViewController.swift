@@ -32,6 +32,7 @@ final class HomeViewController: UIViewController {
         locationButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
         locationButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
         locationButton.widthAnchor.constraint(equalToConstant: 85).isActive = true
+        locationButton.addTarget(self, action: #selector(locationButtonTapped(_:)), for: .touchUpInside)
 
         let dateButton = UIButton(type: .system)
         let formatter = DateFormatter()
@@ -107,6 +108,24 @@ final class HomeViewController: UIViewController {
             popover.permittedArrowDirections = .up
             popover.delegate = self
         }
+        present(vc, animated: true)
+    }
+    
+    @objc private func locationButtonTapped(_ sender: UIButton) {
+        let vc = LocationSelectorViewController()
+        vc.modalPresentationStyle = .popover
+        vc.preferredContentSize = CGSize(width: 220, height: 160)
+        vc.onLocationSelected = { [weak self] location in
+            sender.setTitle("📍 \(location)", for: .normal)
+        }
+
+        if let popover = vc.popoverPresentationController {
+            popover.sourceView = sender
+            popover.sourceRect = sender.bounds
+            popover.permittedArrowDirections = .up
+            popover.delegate = self
+        }
+
         present(vc, animated: true)
     }
 
