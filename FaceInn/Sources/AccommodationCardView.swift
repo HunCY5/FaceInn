@@ -15,11 +15,12 @@ final class AccommodationCardView: UIView {
     let locationLabel = UILabel()
     let priceLabel = UILabel()
     let ratingLabel = UILabel()
-    let viewDetailButton = UIButton()
     let heartButton = UIButton()
 
     private var isLiked = false
     
+    var onCardTapped: (() -> Void)?
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupViews()
@@ -57,18 +58,15 @@ final class AccommodationCardView: UIView {
         ratingLabel.textColor = .systemOrange
         addSubview(ratingLabel)
 
-        viewDetailButton.setTitle("View Details", for: .normal)
-        viewDetailButton.setTitleColor(.white, for: .normal)
-        viewDetailButton.backgroundColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
-        viewDetailButton.titleLabel?.font = .systemFont(ofSize: 13)
-        viewDetailButton.layer.cornerRadius = 6
-        addSubview(viewDetailButton)
-
         heartButton.setImage(UIImage(systemName: "heart"), for: .normal)
         heartButton.tintColor = .gray
         addSubview(heartButton)
         
         heartButton.addTarget(self, action: #selector(heartButtonTapped), for: .touchUpInside)
+        
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(cardTapped))
+        self.addGestureRecognizer(tapGesture)
+        self.isUserInteractionEnabled = true
     }
     @objc private func heartButtonTapped() {
            isLiked.toggle()
@@ -76,9 +74,13 @@ final class AccommodationCardView: UIView {
            heartButton.setImage(UIImage(systemName: heartImageName), for: .normal)
            heartButton.tintColor = isLiked ? .systemRed : .gray
        }
+    
+    @objc private func cardTapped() {
+        onCardTapped?()
+    }
 
     private func setupLayout() {
-        [imageView, nameLabel, locationLabel, priceLabel, ratingLabel, viewDetailButton, heartButton].forEach {
+        [imageView, nameLabel, locationLabel, priceLabel, ratingLabel, heartButton].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
         }
 
@@ -103,19 +105,65 @@ final class AccommodationCardView: UIView {
             ratingLabel.centerYAnchor.constraint(equalTo: priceLabel.centerYAnchor),
             ratingLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
 
-            viewDetailButton.topAnchor.constraint(equalTo: priceLabel.bottomAnchor, constant: 10),
-            viewDetailButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            viewDetailButton.widthAnchor.constraint(equalToConstant: 100),
-            viewDetailButton.heightAnchor.constraint(equalToConstant: 30),
-
-            viewDetailButton.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10)
+            priceLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10)
         ])
     }
 
     func configure(with model: Accommodation) {
         nameLabel.text = model.name
         locationLabel.text = model.location
-        priceLabel.text = "₩\(model.price) / night"
+
+        let guestCount = UserDefaults.standard.integer(forKey: "selectedGuestCount")
+
+        let startDate = UserDefaults.standard.object(forKey: "selectedStartDate") as? Date
+        let endDate = UserDefaults.standard.object(forKey: "selectedEndDate") as? Date
+
+        var numberOfNights = 1
+        if let start = startDate, let end = endDate {
+            let nights = Calendar.current.dateComponents([.day], from: start, to: end).day ?? 0
+            numberOfNights = max(1, nights)
+        }
+
+        if let rooms = model.rooms {
+            // 인원 조건에 맞는 룸 가격들 필터링
+            let validPrices = rooms.compactMap { roomDict -> Int? in
+                guard
+                    let occupancy = roomDict["maxOccupancy"] as? Int,
+                    let price = roomDict["price"] as? Int
+                else { return nil }
+
+                return occupancy >= guestCount ? price : nil
+            }
+
+            if let lowestPrice = validPrices.min() {
+                let formatter = NumberFormatter()
+                formatter.numberStyle = .decimal
+                let formattedPrice = formatter.string(from: NSNumber(value: lowestPrice)) ?? "\(lowestPrice)"
+                let totalPrice = lowestPrice * numberOfNights
+                let totalFormatted = formatter.string(from: NSNumber(value: totalPrice)) ?? "\(totalPrice)"
+                // Use attributed string for price label
+                let priceText = NSMutableAttributedString(string: "₩\(totalFormatted) / ", attributes: [
+                    .foregroundColor: UIColor.black
+                ])
+                priceText.append(NSAttributedString(string: "\(numberOfNights)박", attributes: [
+                    .foregroundColor: UIColor.darkGray,
+                    .font: UIFont.systemFont(ofSize: 13)
+                ]))
+                priceLabel.attributedText = priceText
+            } else {
+                // Use attributed string for unavailable price
+                let priceUnavailableText = NSMutableAttributedString(string: "₩- / ", attributes: [
+                    .foregroundColor: UIColor.black
+                ])
+                priceUnavailableText.append(NSAttributedString(string: "\(numberOfNights)박", attributes: [
+                    .foregroundColor: UIColor.darkGray,
+                    .font: UIFont.systemFont(ofSize: 13)
+                ]))
+                priceLabel.attributedText = priceUnavailableText // 조건에 맞는 방 없음
+            }
+        } else {
+            priceLabel.text = "₩- / 박" // rooms 정보 없음
+        }
         let star = "⭐️ "
         let ratingString = String(format: "%.1f", model.rating)
         let reviewString = " (\(model.reviewCount))"
@@ -153,4 +201,5 @@ final class AccommodationCardView: UIView {
             print("⚠️ imageURLs가 비었거나 잘못됨: \(model.imageURLs ?? [])")
         }
     }
+    
 }

@@ -12,6 +12,12 @@ final class AccommodationCell: UICollectionViewCell {
 
     private let cardView = AccommodationCardView()
 
+    var onCardTapped: (() -> Void)? {
+        didSet {
+            cardView.onCardTapped = onCardTapped
+        }
+    }
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         contentView.addSubview(cardView)

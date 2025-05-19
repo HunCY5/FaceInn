@@ -11,6 +11,16 @@ import FirebaseStorage
 
 final class HomeViewController: UIViewController {
 
+    private let appTitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "FaceInn"
+        label.font = UIFont.boldSystemFont(ofSize: 24)
+        label.textColor = UIColor.black
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
     private let searchBar: UISearchBar = {
         let sb = UISearchBar()
         sb.placeholder = "Search destinations, hotels..."
@@ -91,6 +101,28 @@ final class HomeViewController: UIViewController {
         setupCollectionView()
         searchBar.delegate = self
         fetchAccommodations()
+        if let locationButton = filterStackView.arrangedSubviews[0] as? UIButton {
+            let savedLocation = UserDefaults.standard.string(forKey: "selectedLocation") ?? "위치"
+            locationButton.setTitle("📍 \(savedLocation)", for: .normal)
+        }
+
+        if let dateButton = filterStackView.arrangedSubviews[1] as? UIButton {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "ko_KR")
+            formatter.dateFormat = "M월 d일"
+            if let start = UserDefaults.standard.object(forKey: "selectedStartDate") as? Date,
+               let end = UserDefaults.standard.object(forKey: "selectedEndDate") as? Date {
+                let title = "📅 \(formatter.string(from: start)) - \(formatter.string(from: end))"
+                dateButton.setTitle(title, for: .normal)
+            }
+        }
+
+        if let guestButton = filterStackView.arrangedSubviews[2] as? UIButton {
+            let savedGuestCount = UserDefaults.standard.object(forKey: "selectedGuestCount") != nil ?
+                UserDefaults.standard.integer(forKey: "selectedGuestCount") : 2
+            guestButton.setTitle("👥 \(savedGuestCount)명", for: .normal)
+        }
+
         if let dateButton = filterStackView.arrangedSubviews[1] as? UIButton {
             dateButton.addTarget(self, action: #selector(dateButtonTapped(_:)), for: .touchUpInside)
         }
@@ -101,7 +133,10 @@ final class HomeViewController: UIViewController {
         vc.modalPresentationStyle = .popover
         vc.preferredContentSize = CGSize(width: 220, height: 160)
         vc.onGuestsSelected = { [weak self] adults, children in
-            sender.setTitle("👥 \(adults + children)명", for: .normal)
+            let totalGuests = adults + children
+            sender.setTitle("👥 \(totalGuests)명", for: .normal)
+            UserDefaults.standard.set(totalGuests, forKey: "selectedGuestCount")
+            self?.fetchAccommodations()
         }
 
         if let popover = vc.popoverPresentationController {
@@ -119,6 +154,7 @@ final class HomeViewController: UIViewController {
         vc.preferredContentSize = CGSize(width: 220, height: 160)
         vc.onLocationSelected = { [weak self] location in
             sender.setTitle("📍 \(location)", for: .normal)
+            UserDefaults.standard.set(location, forKey: "selectedLocation")
             if location == "위치" {
                 self?.filteredAccommodations = self?.accommodations ?? []
             } else {
@@ -144,6 +180,7 @@ final class HomeViewController: UIViewController {
         vc.modalPresentationStyle = .popover
         vc.preferredContentSize = CGSize(width: 280, height: 300)
         vc.onDateSelected = { [weak self] startDate, endDate in
+            guard let self else { return }
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "ko_KR")
             formatter.dateFormat = "M월 d일"
@@ -154,6 +191,7 @@ final class HomeViewController: UIViewController {
                 let title = "📅 \(formatter.string(from: start))"
                 sender.setTitle(title, for: .normal)
             }
+            self.fetchAccommodations()
         }
 
         if let popover = vc.popoverPresentationController {
@@ -173,6 +211,7 @@ final class HomeViewController: UIViewController {
         topStack.spacing = 6
         topStack.translatesAutoresizingMaskIntoConstraints = false
 
+        view.addSubview(appTitleLabel)
         view.addSubview(topStack)
         view.addSubview(collectionView)
 
@@ -180,7 +219,10 @@ final class HomeViewController: UIViewController {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
-            topStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            appTitleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            appTitleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+
+            topStack.topAnchor.constraint(equalTo: appTitleLabel.bottomAnchor, constant: 8),
             topStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             topStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
 
@@ -208,12 +250,26 @@ final class HomeViewController: UIViewController {
                     price: data["price"] as? Int ?? 0,
                     rating: data["rating"] as? Double ?? 0.0,
                     reviewCount: data["reviewCount"] as? Int ?? 0,
-                    imageURLs: data["imageURLs"] as? [String]
+                    imageURLs: data["imageURLs"] as? [String],
+                    rooms: data["rooms"] as? [[String: Any]]
                 )
             }
-            self.filteredAccommodations = self.accommodations
+            let guestCount = UserDefaults.standard.object(forKey: "selectedGuestCount") != nil ?
+                UserDefaults.standard.integer(forKey: "selectedGuestCount") : 2
+
+            self.filteredAccommodations = self.accommodations.filter { accommodation in
+                guard let rooms = accommodation.rooms else { return false }
+                // 해당 호텔의 rooms 중 하나라도 guestCount 이상 수용 가능한 객실이 있어야 포함
+                return rooms.contains { room in
+                    if let maxOccupancy = room["maxOccupancy"] as? Int {
+                        return maxOccupancy >= guestCount
+                    }
+                    return false
+                }
+            }
             DispatchQueue.main.async {
-                self.collectionView.reloadData()
+                let section = IndexSet(integer: 0)
+                self.collectionView.reloadSections(section)
             }
         }
     }
@@ -229,6 +285,13 @@ extension HomeViewController: UICollectionViewDataSource {
             return UICollectionViewCell()
         }
         cell.configure(with: filteredAccommodations[indexPath.item])
+        cell.onCardTapped = { [weak self] in
+            guard let self = self else { return }
+            let accommodation = self.filteredAccommodations[indexPath.item]
+            let detailVC = AccommodationDetailViewController()
+            detailVC.accommodation = accommodation
+            self.navigationController?.pushViewController(detailVC, animated: true)
+        }
         return cell
     }
 }

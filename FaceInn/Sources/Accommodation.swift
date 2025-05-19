@@ -14,4 +14,5 @@ struct Accommodation {
     let rating: Double
     let reviewCount: Int
     let imageURLs: [String]?
+    let rooms: [[String: Any]]?
 }

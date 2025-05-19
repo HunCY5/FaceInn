@@ -41,12 +41,17 @@ final class DatePickerPopoverViewController: UIViewController, FSCalendarDelegat
             calendar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
         ])
 
-        let today = Date()
-        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today)!
-        startDate = today
-        endDate = tomorrow
-        calendar.select(today)
-        calendar.select(tomorrow)
+        let savedStart = UserDefaults.standard.object(forKey: "selectedStartDate") as? Date
+        let savedEnd = UserDefaults.standard.object(forKey: "selectedEndDate") as? Date
+
+        if let start = savedStart {
+            startDate = start
+            calendar.select(start)
+        }
+        if let end = savedEnd {
+            endDate = end
+            calendar.select(end)
+        }
         calendar.appearance.todayColor = .white
         calendar.appearance.titleTodayColor = UIColor.black
         calendar.appearance.borderRadius = 1.0
@@ -57,19 +62,22 @@ final class DatePickerPopoverViewController: UIViewController, FSCalendarDelegat
         
         // Clear default selection if user interacts first time with different date
         if let start = startDate, let end = endDate, !Calendar.current.isDate(date, inSameDayAs: start), !Calendar.current.isDate(date, inSameDayAs: end) {
+
+        if let start = startDate, let end = endDate {
+            // 무조건 초기화 후 다시 선택
             for selected in calendar.selectedDates {
                 calendar.deselect(selected)
             }
-            startDate = nil
+            startDate = date
             endDate = nil
             calendar.reloadData()
             calendar.select(date)
-            startDate = date
             onDateSelected?(startDate, endDate)
+            UserDefaults.standard.set(startDate, forKey: "selectedStartDate")
+            UserDefaults.standard.set(endDate, forKey: "selectedEndDate")
             return
         }
 
-        // If one date is selected
         if let start = startDate, endDate == nil {
             if date < start {
                 endDate = start
@@ -80,13 +88,14 @@ final class DatePickerPopoverViewController: UIViewController, FSCalendarDelegat
             calendar.select(startDate!)
             calendar.select(endDate!)
             calendar.reloadData()
-        }
-        // If no date is selected yet
-        else if startDate == nil {
+        } else if startDate == nil {
             startDate = date
             calendar.select(date)
         }
+
         onDateSelected?(startDate, endDate)
+        UserDefaults.standard.set(startDate, forKey: "selectedStartDate")
+        UserDefaults.standard.set(endDate, forKey: "selectedEndDate")
     }
 
     func calendar(_ calendar: FSCalendar, appearance: FSCalendarAppearance, fillSelectionColorFor date: Date) -> UIColor? {
@@ -110,4 +119,8 @@ final class DatePickerPopoverViewController: UIViewController, FSCalendarDelegat
         return nil
     }
     
+    // Set the minimum selectable date for the calendar
+    func minimumDate(for calendar: FSCalendar) -> Date {
+        return Calendar.current.startOfDay(for: Date())
+    }
 }
