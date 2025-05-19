@@ -119,6 +119,14 @@ final class HomeViewController: UIViewController {
         vc.preferredContentSize = CGSize(width: 220, height: 160)
         vc.onLocationSelected = { [weak self] location in
             sender.setTitle("📍 \(location)", for: .normal)
+            if location == "위치" {
+                self?.filteredAccommodations = self?.accommodations ?? []
+            } else {
+                self?.filteredAccommodations = self?.accommodations.filter {
+                    $0.location.localizedCaseInsensitiveContains(location)
+                } ?? []
+            }
+            self?.collectionView.reloadData()
         }
 
         if let popover = vc.popoverPresentationController {
