@@ -22,8 +22,8 @@ final class HomeViewController: UIViewController {
 
     private let filterStackView: UIStackView = {
         let locationButton = UIButton(type: .system)
-        locationButton.setTitle("📍 Location", for: .normal)
-        locationButton.contentHorizontalAlignment = .left
+        locationButton.setTitle("📍 위치", for: .normal)
+        locationButton.contentHorizontalAlignment = .center
         locationButton.tintColor = .black
         locationButton.layer.cornerRadius = 8
         locationButton.layer.borderWidth = 1
@@ -31,10 +31,16 @@ final class HomeViewController: UIViewController {
         locationButton.backgroundColor = .white
         locationButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
         locationButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        locationButton.widthAnchor.constraint(equalToConstant: 85).isActive = true
 
         let dateButton = UIButton(type: .system)
-        dateButton.setTitle("📅 Dates", for: .normal)
-        dateButton.contentHorizontalAlignment = .left
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "M월 d일"
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
+        let title = "📅 \(formatter.string(from: Date())) - \(formatter.string(from: tomorrow))"
+        dateButton.setTitle(title, for: .normal)
+        dateButton.contentHorizontalAlignment = .center
         dateButton.tintColor = .black
         dateButton.layer.cornerRadius = 8
         dateButton.layer.borderWidth = 1
@@ -42,10 +48,11 @@ final class HomeViewController: UIViewController {
         dateButton.backgroundColor = .white
         dateButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
         dateButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        dateButton.widthAnchor.constraint(equalToConstant: 150).isActive = true
 
         let guestButton = UIButton(type: .system)
-        guestButton.setTitle("👥 Guests", for: .normal)
-        guestButton.contentHorizontalAlignment = .left
+        guestButton.setTitle("👥 2명", for: .normal)
+        guestButton.contentHorizontalAlignment = .center
         guestButton.tintColor = .black
         guestButton.layer.cornerRadius = 8
         guestButton.layer.borderWidth = 1
@@ -53,12 +60,13 @@ final class HomeViewController: UIViewController {
         guestButton.backgroundColor = .white
         guestButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
         guestButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        guestButton.widthAnchor.constraint(equalToConstant: 85).isActive = true
         guestButton.addTarget(self, action: #selector(guestButtonTapped(_:)), for: .touchUpInside)
         
 
         let stack = UIStackView(arrangedSubviews: [locationButton, dateButton, guestButton])
         stack.axis = .horizontal
-        stack.distribution = .fillEqually
+        stack.distribution = .fill
         stack.spacing = 8
         stack.translatesAutoresizingMaskIntoConstraints = false
         return stack
@@ -80,6 +88,9 @@ final class HomeViewController: UIViewController {
         setupLayout()
         setupCollectionView()
         fetchAccommodations()
+        if let dateButton = filterStackView.arrangedSubviews[1] as? UIButton {
+            dateButton.addTarget(self, action: #selector(dateButtonTapped(_:)), for: .touchUpInside)
+        }
     }
 
     @objc private func guestButtonTapped(_ sender: UIButton) {
@@ -87,7 +98,33 @@ final class HomeViewController: UIViewController {
         vc.modalPresentationStyle = .popover
         vc.preferredContentSize = CGSize(width: 220, height: 160)
         vc.onGuestsSelected = { [weak self] adults, children in
-            sender.setTitle("👥 \(adults + children) Guests", for: .normal)
+            sender.setTitle("👥 \(adults + children)명", for: .normal)
+        }
+
+        if let popover = vc.popoverPresentationController {
+            popover.sourceView = sender
+            popover.sourceRect = sender.bounds
+            popover.permittedArrowDirections = .up
+            popover.delegate = self
+        }
+        present(vc, animated: true)
+    }
+
+    @objc private func dateButtonTapped(_ sender: UIButton) {
+        let vc = DatePickerPopoverViewController()
+        vc.modalPresentationStyle = .popover
+        vc.preferredContentSize = CGSize(width: 280, height: 300)
+        vc.onDateSelected = { [weak self] startDate, endDate in
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "ko_KR")
+            formatter.dateFormat = "M월 d일"
+            if let start = startDate, let end = endDate {
+                let title = "📅 \(formatter.string(from: start)) - \(formatter.string(from: end))"
+                sender.setTitle(title, for: .normal)
+            } else if let start = startDate {
+                let title = "📅 \(formatter.string(from: start))"
+                sender.setTitle(title, for: .normal)
+            }
         }
 
         if let popover = vc.popoverPresentationController {

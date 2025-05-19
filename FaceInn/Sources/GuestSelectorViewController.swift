@@ -33,7 +33,7 @@ final class GuestSelectorViewController: UIViewController {
         view.layer.shadowColor = UIColor.black.cgColor
 
         let adultTitle = UILabel()
-        adultTitle.text = "Adults"
+        adultTitle.text = "성인"
         adultTitle.font = .boldSystemFont(ofSize: 14)
 
         let adultSubtitle = UILabel()
@@ -62,10 +62,10 @@ final class GuestSelectorViewController: UIViewController {
 
         let adultStack = UIStackView(arrangedSubviews: [adultTitle, adultSubtitle, adultRow])
         adultStack.axis = .vertical
-        adultStack.spacing = 4
+        adultStack.spacing = 2
 
         let childTitle = UILabel()
-        childTitle.text = "Children"
+        childTitle.text = "아동"
         childTitle.font = .boldSystemFont(ofSize: 14)
 
         let childSubtitle = UILabel()
@@ -94,11 +94,11 @@ final class GuestSelectorViewController: UIViewController {
 
         let childStack = UIStackView(arrangedSubviews: [childTitle, childSubtitle, childRow])
         childStack.axis = .vertical
-        childStack.spacing = 4
+        childStack.spacing = 6
 
         let mainStack = UIStackView(arrangedSubviews: [adultStack, childStack])
         mainStack.axis = .vertical
-        mainStack.spacing = 16
+        mainStack.spacing = 10
         mainStack.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(mainStack)
@@ -114,8 +114,10 @@ final class GuestSelectorViewController: UIViewController {
         let btn = UIButton(type: .system)
         btn.setTitle(title, for: .normal)
         btn.titleLabel?.font = .boldSystemFont(ofSize: 14)
+        let customColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1.0)
+        btn.setTitleColor(customColor, for: .normal)
         btn.layer.borderWidth = 1
-        btn.layer.borderColor = UIColor.systemGray3.cgColor
+        btn.layer.borderColor = customColor.cgColor
         btn.layer.cornerRadius = 6
         btn.addAction(UIAction { _ in action() }, for: .touchUpInside)
         btn.widthAnchor.constraint(equalToConstant: 24).isActive = true
