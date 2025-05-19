@@ -10,6 +10,7 @@ FaceInn/
 │   └── FaceInn/
 │       └── Sources/
 │       └── Resources/
+│           └── GoogleService-Info.plists 
 │       └── Tests/
 ├── Project.swift         # Tuist 설정 파일(tuist generate 시, 생성 기준)
 ├── .gitignore
@@ -26,7 +27,7 @@ FaceInn/
 >> sudo chown -R $(whoami) ~/.local
 
 ## .gitignore 설정
-- .xcodeproj, .xcworkspace(현재 ignore되어 있는 상태. 변경사항 추적되면 아래의 작업 실행)
+- .xcodeproj, .xcworkspace(현재 ignore되어 있는 상태. 변경사항 추적되면 아래의 작업 실행), GoogleService-Info.plists
 ### 커밋할 때 추적될 시
 >> git rm --cached *.xcodeproj
 >> git rm --cached *.xcworkspace
