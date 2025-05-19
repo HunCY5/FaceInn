@@ -18,7 +18,23 @@ final class LocationSelectorViewController: UIViewController {
         let titleLabel = UILabel()
         titleLabel.text = "인기 지역"
         titleLabel.font = UIFont.boldSystemFont(ofSize: 16)
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let resetButton = UIButton(type: .system)
+        resetButton.setTitle("초기화", for: .normal)
+        resetButton.setTitleColor(.lightGray, for: .normal)
+        resetButton.titleLabel?.font = UIFont.systemFont(ofSize: 13)
+        resetButton.contentEdgeInsets = UIEdgeInsets(top: 4, left: 6, bottom: 4, right: 6)
+        resetButton.layer.cornerRadius = 12
+        resetButton.layer.borderWidth = 1
+        resetButton.layer.borderColor = UIColor.lightGray.cgColor
+        resetButton.addTarget(self, action: #selector(clearSelectedLocation), for: .touchUpInside)
+        resetButton.translatesAutoresizingMaskIntoConstraints = false
+        resetButton.widthAnchor.constraint(equalToConstant: 50).isActive = true
+
+        let titleStack = UIStackView(arrangedSubviews: [titleLabel, resetButton])
+        titleStack.axis = .horizontal
+        titleStack.spacing = 8
+        titleStack.alignment = .center
 
         let locations = ["서울", "부산", "제주", "강릉"]
         let buttons = locations.map { location -> UIButton in
@@ -47,7 +63,7 @@ final class LocationSelectorViewController: UIViewController {
             grid.addArrangedSubview(row)
         }
 
-        let stack = UIStackView(arrangedSubviews: [titleLabel, grid])
+        let stack = UIStackView(arrangedSubviews: [titleStack, grid])
         stack.axis = .vertical
         stack.spacing = 6
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -65,6 +81,12 @@ final class LocationSelectorViewController: UIViewController {
     @objc private func locationTapped(_ sender: UIButton) {
         guard let title = sender.currentTitle else { return }
         onLocationSelected?(title)
+        dismiss(animated: true)
+    }
+    
+    @objc private func clearSelectedLocation() {
+        // Implement your logic to clear/reset the selected location, if needed
+        onLocationSelected?("위치")
         dismiss(animated: true)
     }
 }
