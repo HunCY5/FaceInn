@@ -22,12 +22,13 @@ final class GuestSelectorViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Load saved guest count from UserDefaults
-        let savedGuestCount = UserDefaults.standard.integer(forKey: "selectedGuestCount")
-        if savedGuestCount > 1 {
-            self.adults = savedGuestCount
-            self.childCount = 0
+        // Load saved adult and child counts from UserDefaults
+        let savedAdultCount = UserDefaults.standard.integer(forKey: "selectedAdultCount")
+        let savedChildCount = UserDefaults.standard.integer(forKey: "selectedChildCount")
+        if savedAdultCount >= 1 {
+            self.adults = savedAdultCount
         }
+        self.childCount = savedChildCount
         setupUI()
     }
 
@@ -135,6 +136,7 @@ final class GuestSelectorViewController: UIViewController {
         adultCountLabel.text = "\(adults)"
         childCountLabel.text = "\(childCount)"
         onGuestsSelected?(adults, childCount)
-        UserDefaults.standard.set(adults + childCount, forKey: "selectedGuestCount")
+        UserDefaults.standard.set(adults, forKey: "selectedAdultCount")
+        UserDefaults.standard.set(childCount, forKey: "selectedChildCount")
     }
 }
