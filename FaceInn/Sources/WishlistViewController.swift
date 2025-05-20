@@ -146,6 +146,13 @@ extension WishlistViewController: UICollectionViewDataSource {
         cell.onLikeChanged = {
             NotificationCenter.default.post(name: .AuthStateDidChange, object: nil)
         }
+        cell.onCardTapped = { [weak self] in
+            guard let self = self else { return }
+            let accommodation = self.filteredAccommodations[indexPath.item]
+            let detailVC = AccommodationDetailViewController()
+            detailVC.accommodation = accommodation
+            self.navigationController?.pushViewController(detailVC, animated: true)
+        }
         return cell
     }
 }
