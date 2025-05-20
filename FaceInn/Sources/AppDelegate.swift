@@ -34,6 +34,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             print("❌ 로그인된 사용자 없음")
         }
         
+        let barAppearance = UIBarButtonItem.appearance()
+        barAppearance.setBackButtonTitlePositionAdjustment(UIOffset(horizontal: -1000, vertical: 0), for: .default)
         return true
     }
     

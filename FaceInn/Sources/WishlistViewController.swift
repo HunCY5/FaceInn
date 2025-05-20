@@ -102,7 +102,10 @@ final class WishlistViewController: UIViewController {
                         rating: data["rating"] as? Double ?? 0.0,
                         reviewCount: data["reviewCount"] as? Int ?? 0,
                         imageURLs: data["imageURLs"] as? [String],
-                        rooms: data["rooms"] as? [[String: Any]]
+                        rooms: data["rooms"] as? [[String: Any]],
+                        amenities: data["amenities"] as? [String],
+                        description: data["description"] as? String ?? "",
+                        hostId: data["hostId"] as? String ?? ""
                     )
                     loadedAccommodations.append(accommodation)
                 }
