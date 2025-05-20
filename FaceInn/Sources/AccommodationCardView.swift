@@ -9,6 +9,7 @@ import UIKit
 import FirebaseStorage
 import FirebaseAuth
 import FirebaseFirestore
+import Kingfisher
 
 final class AccommodationCardView: UIView {
 
@@ -242,11 +243,6 @@ final class AccommodationCardView: UIView {
 
         if let urlString = model.imageURLs?.first, let url = URL(string: urlString) {
             print("📸 이미지 URL 시도: \(urlString)")
-            // Remove existing activity indicators
-            imageView.subviews.forEach { if $0 is UIActivityIndicatorView { $0.removeFromSuperview() } }
-
-            // Set loading animation before starting image load
-            imageView.image = nil
             let activity = UIActivityIndicatorView(style: .medium)
             activity.color = .darkGray
             activity.translatesAutoresizingMaskIntoConstraints = false
@@ -257,30 +253,18 @@ final class AccommodationCardView: UIView {
             ])
             activity.startAnimating()
 
-            URLSession.shared.dataTask(with: url) { data, _, error in
-                if let error = error {
-                    print("❌ 이미지 다운로드 실패: \(error.localizedDescription)")
-                    DispatchQueue.main.async {
-                        activity.stopAnimating()
-                        activity.removeFromSuperview()
-                    }
-                    return
-                }
-                guard let data = data else {
-                    print("❗️ 이미지 데이터가 없음")
-                    DispatchQueue.main.async {
-                        activity.stopAnimating()
-                        activity.removeFromSuperview()
-                    }
-                    return
-                }
+            imageView.kf.setImage(with: url, placeholder: nil, options: nil) { result in
                 DispatchQueue.main.async {
-                    self.imageView.image = UIImage(data: data)
                     activity.stopAnimating()
                     activity.removeFromSuperview()
-                    print("✅ 이미지 적용 완료")
                 }
-            }.resume()
+                switch result {
+                case .success:
+                    print("✅ 이미지 적용 완료")
+                case .failure(let error):
+                    print("❌ 이미지 다운로드 실패: \(error.localizedDescription)")
+                }
+            }
         } else {
             print("⚠️ imageURLs가 비었거나 잘못됨: \(model.imageURLs ?? [])")
         }
