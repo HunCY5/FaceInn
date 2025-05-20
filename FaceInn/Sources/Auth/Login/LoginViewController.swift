@@ -43,6 +43,7 @@ final class LoginViewController: UIViewController {
                 switch result {
                 case .success:
                     self?.onLoginSuccess?()
+                    NotificationCenter.default.post(name: .userDidLogin, object: nil)
                     self?.navigationController?.popViewController(animated: true)
                 case .failure(let error):
                     self?.showAlert(title: "로그인 실패", message: error.localizedDescription)
@@ -65,4 +66,8 @@ final class LoginViewController: UIViewController {
 
 #Preview {
     LoginViewController()
+}
+
+extension Notification.Name {
+    static let userDidLogin = Notification.Name("userDidLogin")
 }

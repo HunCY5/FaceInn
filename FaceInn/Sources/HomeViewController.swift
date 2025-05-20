@@ -128,7 +128,12 @@ final class HomeViewController: UIViewController {
         }
         setupKeyboardDismissal()
         addDoneButtonOnKeyboard()
+        NotificationCenter.default.addObserver(self, selector: #selector(handleAuthChanged), name: .AuthStateDidChange, object: nil)
     }
+
+@objc private func handleAuthChanged() {
+    collectionView.reloadData()
+}
 
     private func addDoneButtonOnKeyboard() {
         let doneToolbar: UIToolbar = UIToolbar()
@@ -322,9 +327,13 @@ extension HomeViewController: UICollectionViewDataSource {
             let alert = UIAlertController(title: "로그인이 필요합니다", message: "찜 기능은 로그인 후 사용 가능합니다.", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "로그인", style: .default, handler: { _ in
                 let loginVC = LoginViewController()
-                loginVC.onLoginSuccess = {
-                    // 로그인 후 찜 실행
-                    cell.toggleLike() // AccommodationCardView에 메서드 존재한다고 가정
+                loginVC.onLoginSuccess = { [weak self] in
+                    if cell.isLiked == false {
+                        cell.toggleLike()
+                        self?.collectionView.reloadData()
+                    } else {
+                        self?.collectionView.reloadData()
+                    }
                 }
                 self.navigationController?.pushViewController(loginVC, animated: true)
             }))
@@ -357,4 +366,9 @@ extension HomeViewController: UISearchBarDelegate {
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         searchBar.resignFirstResponder()
     }
+}
+
+
+extension Notification.Name {
+    static let AuthStateDidChange = Notification.Name("AuthStateDidChange")
 }

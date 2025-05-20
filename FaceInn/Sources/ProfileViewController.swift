@@ -60,6 +60,7 @@ final class ProfileViewController: UIViewController {
     @objc private func didTapLogout() {
         do {
             try Auth.auth().signOut()
+            NotificationCenter.default.post(name: .AuthStateDidChange, object: nil)
             updateLoginUI()
         } catch {
             print("로그아웃 실패: \(error.localizedDescription)")

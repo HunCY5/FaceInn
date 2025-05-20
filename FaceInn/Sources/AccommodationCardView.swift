@@ -18,8 +18,9 @@ final class AccommodationCardView: UIView {
     let priceLabel = UILabel()
     let ratingLabel = UILabel()
     let heartButton = UIButton()
-
-    private var isLiked = false
+    
+    var isLiked = false
+    private var accommodationId: String?
     
     var onCardTapped: (() -> Void)?
     var onLikeRequested: (() -> Void)?
@@ -80,10 +81,23 @@ final class AccommodationCardView: UIView {
             return
         }
         
+        guard let accommodationId = accommodationId else { return }
+        
         isLiked.toggle()
         let heartImageName = isLiked ? "heart.fill" : "heart"
         heartButton.setImage(UIImage(systemName: heartImageName), for: .normal)
         heartButton.tintColor = isLiked ? .systemRed : .gray
+        
+        let userRef = Firestore.firestore().collection("users").document(user.uid)
+        if isLiked {
+            userRef.updateData([
+                "wishList": FieldValue.arrayUnion([accommodationId])
+            ])
+        } else {
+            userRef.updateData([
+                "wishList": FieldValue.arrayRemove([accommodationId])
+            ])
+        }
     }
 
     // Public method to allow external triggering of like toggling
@@ -92,11 +106,24 @@ final class AccommodationCardView: UIView {
             onLikeRequested?()
             return
         }
-
+        
+        guard let accommodationId = accommodationId else { return }
+        
         isLiked.toggle()
         let heartImageName = isLiked ? "heart.fill" : "heart"
         heartButton.setImage(UIImage(systemName: heartImageName), for: .normal)
         heartButton.tintColor = isLiked ? .systemRed : .gray
+        
+        let userRef = Firestore.firestore().collection("users").document(user.uid)
+        if isLiked {
+            userRef.updateData([
+                "wishList": FieldValue.arrayUnion([accommodationId])
+            ])
+        } else {
+            userRef.updateData([
+                "wishList": FieldValue.arrayRemove([accommodationId])
+            ])
+        }
     }
     
     @objc private func cardTapped() {
@@ -136,6 +163,7 @@ final class AccommodationCardView: UIView {
     }
 
     func configure(with model: Accommodation) {
+        self.accommodationId = model.id
         nameLabel.text = model.name
         locationLabel.text = model.location
 
@@ -251,6 +279,39 @@ final class AccommodationCardView: UIView {
         } else {
             print("⚠️ imageURLs가 비었거나 잘못됨: \(model.imageURLs ?? [])")
         }
+        updateHeartState()
+    }
+    
+    private func updateHeartState() {
+        guard let accommodationId = self.accommodationId else {
+            self.setHeartState(isLiked: false)
+            return
+        }
+
+        guard let user = Auth.auth().currentUser, !user.isAnonymous else {
+            self.setHeartState(isLiked: false)
+            return
+        }
+
+        let userRef = Firestore.firestore().collection("users").document(user.uid)
+        userRef.getDocument { snapshot, error in
+            var isLiked = false
+            if let data = snapshot?.data(),
+               let wishList = data["wishList"] as? [String] {
+                isLiked = wishList.contains(accommodationId)
+            }
+
+            DispatchQueue.main.async {
+                self.setHeartState(isLiked: isLiked)
+            }
+        }
+    }
+    
+    private func setHeartState(isLiked: Bool) {
+        self.isLiked = isLiked
+        let heartImageName = isLiked ? "heart.fill" : "heart"
+        heartButton.setImage(UIImage(systemName: heartImageName), for: .normal)
+        heartButton.tintColor = isLiked ? .systemRed : .gray
     }
     
 }

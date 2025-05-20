@@ -47,4 +47,8 @@ final class AccommodationCell: UICollectionViewCell {
     func toggleLike() {
         cardView.toggleLike()
     }
+
+    var isLiked: Bool {
+        return cardView.isLiked
+    }
 }
