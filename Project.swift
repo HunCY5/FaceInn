@@ -3,7 +3,8 @@ import ProjectDescription
 let project = Project(
   name: "FaceInn",
   packages: [
-    .package(url: "https://github.com/firebase/firebase-ios-sdk.git", .upToNextMajor(from: "10.15.0"))
+    .package(url: "https://github.com/firebase/firebase-ios-sdk.git", .upToNextMajor(from: "10.15.0")),
+    .package(url: "https://github.com/WenchaoD/FSCalendar", .upToNextMajor(from: "2.8.2")) // ✅ 패키지 추가
   ],
   targets: [
     .target(
@@ -38,7 +39,8 @@ let project = Project(
         .package(product: "FirebaseAuth"),
         .package(product: "FirebaseFirestore"),
         .package(product: "FirebaseStorage"),
-        .package(product: "FirebaseDatabase")
+        .package(product: "FirebaseDatabase"),
+        .package(product: "FSCalendar")
       ],
       settings: .settings(
         base: [
