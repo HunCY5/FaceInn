@@ -7,6 +7,7 @@
 
 import UIKit
 import Kingfisher
+import FirebaseAuth
 
 final class RoomCardView: UIView {
 
@@ -174,7 +175,38 @@ final class RoomCardView: UIView {
     }
     @objc private func didTapReserveButton() {
         guard let room = currentRoom else { return }
+
+        if Auth.auth().currentUser == nil || Auth.auth().currentUser?.isAnonymous == true {
+            let alert = UIAlertController(title: "로그인이 필요합니다", message: "숙박 예약을 위해 로그인이 필요합니다.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "취소", style: .cancel, handler: nil))
+            alert.addAction(UIAlertAction(title: "로그인하기", style: .default, handler: { _ in
+                // Assuming the current view is embedded in a view controller
+                if let viewController = self.findViewController() {
+                    let loginVC = LoginViewController()
+                    loginVC.onLoginSuccess = {
+                        // 로그인 후 돌아오기만 함
+                    }
+                    viewController.navigationController?.pushViewController(loginVC, animated: true)
+                }
+            }))
+            if let viewController = self.findViewController() {
+                viewController.present(alert, animated: true)
+            }
+            return
+        }
+
         onReserveButtonTapped?(room)
+    }
+
+    private func findViewController() -> UIViewController? {
+        var responder: UIResponder? = self
+        while let r = responder {
+            if let vc = r as? UIViewController {
+                return vc
+            }
+            responder = r.next
+        }
+        return nil
     }
 }
 
