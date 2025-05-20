@@ -38,7 +38,8 @@ let project = Project(
         .package(product: "FirebaseAuth"),
         .package(product: "FirebaseFirestore"),
         .package(product: "FirebaseStorage"),
-        .package(product: "FirebaseDatabase")
+        .package(product: "FirebaseDatabase"),
+        .package(product: "FirebaseMessaging")
       ],
       settings: .settings(
         base: [
