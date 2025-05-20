@@ -17,6 +17,8 @@ final class AccommodationDetailViewController: UIViewController, UICollectionVie
     private let scrollView = UIScrollView()
     private let contentView = UIView()
 
+    private let roomCardsStackView = UIStackView()
+
     var accommodation: Accommodation?
 
     private static var lastDisplayedRooms: [AccommodationRoom] = []
@@ -212,114 +214,22 @@ final class AccommodationDetailViewController: UIViewController, UICollectionVie
             guestButton.widthAnchor.constraint(equalToConstant: 120)
         ])
 
-        var lastBottomAnchor: NSLayoutYAxisAnchor = guestButton.bottomAnchor
-        let startDate = UserDefaults.standard.object(forKey: "selectedStartDate") as? Date
-        let endDate = UserDefaults.standard.object(forKey: "selectedEndDate") as? Date
-        let numberOfNights = Calendar.current.dateComponents([.day], from: startDate ?? Date(), to: endDate ?? Date()).day ?? 1
-        if let rooms = accommodation?.rooms {
-            let guestCount = UserDefaults.standard.integer(forKey: "selectedGuestCount")
+        // Room cards stack view
+        roomCardsStackView.axis = .vertical
+        roomCardsStackView.spacing = 20
+        roomCardsStackView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(roomCardsStackView)
 
-            var availableRooms: [AccommodationRoom] = []
-            var unavailableRooms: [AccommodationRoom] = []
+        NSLayoutConstraint.activate([
+            roomCardsStackView.topAnchor.constraint(equalTo: guestButton.bottomAnchor, constant: 20),
+            roomCardsStackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            roomCardsStackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16)
+        ])
 
-            for roomDict in rooms {
-                if let id = roomDict["id"] as? String,
-                   let name = roomDict["name"] as? String,
-                   let description = roomDict["description"] as? String,
-                   let price = roomDict["price"] as? Int,
-                   let maxOccupancy = roomDict["maxOccupancy"] as? Int,
-                   let imageURLs = roomDict["imageURLs"] as? [String],
-                   let checkInTime = roomDict["checkInTime"] as? String,
-                   let checkOutTime = roomDict["checkOutTime"] as? String,
-                   let amenities = roomDict["amenities"] as? [String] {
+        // Load room cards
+        reloadRoomCardsSafely()
 
-                    let room = AccommodationRoom(
-                        id: id,
-                        name: name,
-                        description: description,
-                        price: price,
-                        maxOccupancy: maxOccupancy,
-                        imageURLs: imageURLs,
-                        checkInTime: checkInTime,
-                        checkOutTime: checkOutTime,
-                        amenities: amenities
-                    )
-
-                    if guestCount <= maxOccupancy {
-                        availableRooms.append(room)
-                    } else {
-                        unavailableRooms.append(room)
-                    }
-                }
-            }
-
-            availableRooms.sort { $0.price < $1.price }
-            let sortedRooms = availableRooms + unavailableRooms
-
-            // Refactored shouldForceReload logic block
-            let shouldForceReload: Bool
-            if let start = startDate, let end = endDate,
-               let lastStart = AccommodationDetailViewController.lastSelectedStartDate,
-               let lastEnd = AccommodationDetailViewController.lastSelectedEndDate {
-                let currentNights = Calendar.current.dateComponents([.day], from: start, to: end).day ?? 1
-                let lastNights = Calendar.current.dateComponents([.day], from: lastStart, to: lastEnd).day ?? 1
-                shouldForceReload = currentNights != lastNights
-            } else if startDate != nil && endDate != nil {
-                shouldForceReload = true
-            } else {
-                shouldForceReload = false
-            }
-
-            if sortedRooms == AccommodationDetailViewController.lastDisplayedRooms && !shouldForceReload {
-                return
-            }
-
-            AccommodationDetailViewController.lastDisplayedRooms = sortedRooms
-            AccommodationDetailViewController.lastSelectedStartDate = startDate
-            AccommodationDetailViewController.lastSelectedEndDate = endDate
-            AccommodationDetailViewController.lastSelectedGuestCount = guestCount
-
-            for room in sortedRooms {
-                let roomCard = RoomCardView(room: room, numberOfNights: numberOfNights)
-                roomCard.translatesAutoresizingMaskIntoConstraints = false
-                roomCard.updateGuestCount(guestCount)
-                roomCard.onReserveButtonTapped = { [weak self] room in
-                    guard let self = self, let accommodation = self.accommodation else { return }
-
-                    let reservationVC = ReservationViewController()
-                    reservationVC.accommodation = accommodation
-                    reservationVC.room = room
-
-                    // 숙박 날짜, 박 수, 숙박 인원 전달
-                    if let start = UserDefaults.standard.object(forKey: "selectedStartDate") as? Date,
-                       let end = UserDefaults.standard.object(forKey: "selectedEndDate") as? Date {
-                        reservationVC.startDate = start
-                        reservationVC.endDate = end
-                    }
-
-                    let guestCount = UserDefaults.standard.integer(forKey: "selectedGuestCount")
-                    reservationVC.guestCount = guestCount
-
-                    self.navigationController?.pushViewController(reservationVC, animated: true)
-                }
-                roomCard.alpha = 0
-                roomCard.transform = CGAffineTransform(translationX: 0, y: 30)
-                contentView.addSubview(roomCard)
-
-                NSLayoutConstraint.activate([
-                    roomCard.topAnchor.constraint(equalTo: lastBottomAnchor, constant: 20),
-                    roomCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-                    roomCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16)
-                ])
-                contentView.layoutIfNeeded()
-                UIView.animate(withDuration: 0.35, delay: 0, options: [.curveEaseOut], animations: {
-                    roomCard.alpha = 1
-                    roomCard.transform = .identity
-                }, completion: nil)
-
-                lastBottomAnchor = roomCard.bottomAnchor
-            }
-        }
+        var lastBottomAnchor: NSLayoutYAxisAnchor = roomCardsStackView.bottomAnchor
 
         if let introduction = accommodation?.description {
             let introductionTitleLabel = UILabel()
@@ -428,9 +338,7 @@ final class AccommodationDetailViewController: UIViewController, UICollectionVie
                 UserDefaults.standard.set(start, forKey: "selectedStartDate")
                 UserDefaults.standard.removeObject(forKey: "selectedEndDate")
             }
-        
-            self.view.subviews.forEach { $0.removeFromSuperview() }
-            self.viewDidLoad()
+            self.reloadRoomCardsSafely()
         }
         present(vc, animated: true)
     }
@@ -451,11 +359,98 @@ final class AccommodationDetailViewController: UIViewController, UICollectionVie
             UserDefaults.standard.set(totalGuests, forKey: "selectedGuestCount")
             
             DispatchQueue.main.async {
-                self.view.subviews.forEach { $0.removeFromSuperview() }
-                self.viewDidLoad()
+                self.reloadRoomCardsSafely()
             }
         }
         present(vc, animated: true)
+    }
+
+    private func reloadRoomCardsSafely() {
+        roomCardsStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+
+        let guestCount = UserDefaults.standard.object(forKey: "selectedGuestCount") != nil
+            ? UserDefaults.standard.integer(forKey: "selectedGuestCount")
+            : 2
+
+        let startDate = UserDefaults.standard.object(forKey: "selectedStartDate") as? Date ?? Date()
+        let endDate = UserDefaults.standard.object(forKey: "selectedEndDate") as? Date ?? Calendar.current.date(byAdding: .day, value: 1, to: startDate)!
+
+        let numberOfNights = Calendar.current.dateComponents([.day], from: startDate, to: endDate).day ?? 1
+
+        guard let rooms = accommodation?.rooms else { return }
+
+        var availableRooms: [AccommodationRoom] = []
+        var unavailableRooms: [AccommodationRoom] = []
+
+        for roomDict in rooms {
+            if let id = roomDict["id"] as? String,
+               let name = roomDict["name"] as? String,
+               let description = roomDict["description"] as? String,
+               let price = roomDict["price"] as? Int,
+               let maxOccupancy = roomDict["maxOccupancy"] as? Int,
+               let imageURLs = roomDict["imageURLs"] as? [String],
+               let checkInTime = roomDict["checkInTime"] as? String,
+               let checkOutTime = roomDict["checkOutTime"] as? String,
+               let amenities = roomDict["amenities"] as? [String] {
+
+                let room = AccommodationRoom(
+                    id: id,
+                    name: name,
+                    description: description,
+                    price: price,
+                    maxOccupancy: maxOccupancy,
+                    imageURLs: imageURLs,
+                    checkInTime: checkInTime,
+                    checkOutTime: checkOutTime,
+                    amenities: amenities
+                )
+
+                if guestCount <= maxOccupancy {
+                    availableRooms.append(room)
+                } else {
+                    unavailableRooms.append(room)
+                }
+            }
+        }
+
+        availableRooms.sort { $0.price < $1.price }
+        let sortedRooms = availableRooms + unavailableRooms
+
+        for (index, room) in sortedRooms.enumerated() {
+            let roomCard = RoomCardView(room: room, numberOfNights: numberOfNights)
+            roomCard.translatesAutoresizingMaskIntoConstraints = false
+            roomCard.updateGuestCount(guestCount)
+            roomCard.alpha = 0
+            roomCard.transform = CGAffineTransform(translationX: 0, y: 20)
+
+            roomCard.onReserveButtonTapped = { [weak self] room in
+                guard let self = self, let accommodation = self.accommodation else { return }
+
+                let reservationVC = ReservationViewController()
+                reservationVC.accommodation = accommodation
+                reservationVC.room = room
+                reservationVC.startDate = startDate
+                reservationVC.endDate = endDate
+                reservationVC.guestCount = guestCount
+
+                self.navigationController?.pushViewController(reservationVC, animated: true)
+            }
+
+            roomCardsStackView.addArrangedSubview(roomCard)
+
+            UIView.animate(withDuration: 0.3, delay: 0.05 * Double(index), options: [.curveEaseOut], animations: {
+                roomCard.alpha = 1
+                roomCard.transform = .identity
+            }, completion: nil)
+        }
+
+        if sortedRooms.isEmpty {
+            let label = UILabel()
+            label.text = "조건에 맞는 객실이 없습니다"
+            label.textAlignment = .center
+            label.textColor = .gray
+            roomCardsStackView.addArrangedSubview(label)
+        }
     }
 }
 
