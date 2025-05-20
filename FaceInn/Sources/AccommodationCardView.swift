@@ -31,6 +31,7 @@ final class AccommodationCardView: UIView {
         setupViews()
         setupLayout()
         backgroundColor = .white
+        UINavigationBar.appearance().tintColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
         layer.cornerRadius = 12
         layer.shadowColor = UIColor.black.cgColor
         layer.shadowOpacity = 0.1
