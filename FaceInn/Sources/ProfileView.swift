@@ -18,6 +18,16 @@ final class ProfileView: UIView {
         button.layer.cornerRadius = 8
         return button
     }()
+    
+    let logoutButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("로그아웃", for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.backgroundColor = UIColor.systemBlue
+        button.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        button.layer.cornerRadius = 8
+        return button
+    }()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -38,6 +48,16 @@ final class ProfileView: UIView {
             loginButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             loginButton.widthAnchor.constraint(equalToConstant: 200),
             loginButton.heightAnchor.constraint(equalToConstant: 44)
+        ])
+
+        addSubview(logoutButton)
+        logoutButton.translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            logoutButton.centerXAnchor.constraint(equalTo: centerXAnchor),
+            logoutButton.topAnchor.constraint(equalTo: loginButton.bottomAnchor, constant: 12),
+            logoutButton.widthAnchor.constraint(equalToConstant: 200),
+            logoutButton.heightAnchor.constraint(equalToConstant: 44)
         ])
     }
 }
