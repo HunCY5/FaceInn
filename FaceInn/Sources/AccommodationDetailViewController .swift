@@ -14,6 +14,7 @@ final class AccommodationDetailViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .white
+        self.hidesBottomBarWhenPushed = true
         self.title = accommodation?.name
 
 

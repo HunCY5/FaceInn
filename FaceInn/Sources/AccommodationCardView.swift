@@ -24,6 +24,7 @@ final class AccommodationCardView: UIView {
     
     var onCardTapped: (() -> Void)?
     var onLikeRequested: (() -> Void)?
+    var onLikeChanged: (() -> Void)?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -98,6 +99,8 @@ final class AccommodationCardView: UIView {
                 "wishList": FieldValue.arrayRemove([accommodationId])
             ])
         }
+        onLikeChanged?()
+        NotificationCenter.default.post(name: .AuthStateDidChange, object: nil)
     }
 
     // Public method to allow external triggering of like toggling
@@ -124,6 +127,8 @@ final class AccommodationCardView: UIView {
                 "wishList": FieldValue.arrayRemove([accommodationId])
             ])
         }
+        onLikeChanged?()
+        NotificationCenter.default.post(name: .AuthStateDidChange, object: nil)
     }
     
     @objc private func cardTapped() {
@@ -315,3 +320,4 @@ final class AccommodationCardView: UIView {
     }
     
 }
+

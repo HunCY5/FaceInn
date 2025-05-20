@@ -24,6 +24,12 @@ final class AccommodationCell: UICollectionViewCell {
         }
     }
 
+    var onLikeChanged: (() -> Void)? {
+        didSet {
+            cardView.onLikeChanged = onLikeChanged
+        }
+    }
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         contentView.addSubview(cardView)
