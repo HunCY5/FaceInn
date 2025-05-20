@@ -20,6 +20,9 @@ final class AccommodationDetailViewController: UIViewController, UICollectionVie
     var accommodation: Accommodation?
 
     private static var lastDisplayedRooms: [AccommodationRoom] = []
+    private static var lastSelectedStartDate: Date?
+    private static var lastSelectedEndDate: Date?
+    private static var lastSelectedGuestCount: Int?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -253,11 +256,28 @@ final class AccommodationDetailViewController: UIViewController, UICollectionVie
             availableRooms.sort { $0.price < $1.price }
             let sortedRooms = availableRooms + unavailableRooms
 
-            if sortedRooms == AccommodationDetailViewController.lastDisplayedRooms {
-                return
+            // Refactored shouldForceReload logic block
+            let shouldForceReload: Bool
+            if let start = startDate, let end = endDate,
+               let lastStart = AccommodationDetailViewController.lastSelectedStartDate,
+               let lastEnd = AccommodationDetailViewController.lastSelectedEndDate {
+                let currentNights = Calendar.current.dateComponents([.day], from: start, to: end).day ?? 1
+                let lastNights = Calendar.current.dateComponents([.day], from: lastStart, to: lastEnd).day ?? 1
+                shouldForceReload = currentNights != lastNights
+            } else if startDate != nil && endDate != nil {
+                shouldForceReload = true
             } else {
-                AccommodationDetailViewController.lastDisplayedRooms = sortedRooms
+                shouldForceReload = false
             }
+
+            if sortedRooms == AccommodationDetailViewController.lastDisplayedRooms && !shouldForceReload {
+                return
+            }
+
+            AccommodationDetailViewController.lastDisplayedRooms = sortedRooms
+            AccommodationDetailViewController.lastSelectedStartDate = startDate
+            AccommodationDetailViewController.lastSelectedEndDate = endDate
+            AccommodationDetailViewController.lastSelectedGuestCount = guestCount
 
             for room in sortedRooms {
                 let roomCard = RoomCardView(room: room, numberOfNights: numberOfNights)
