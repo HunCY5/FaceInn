@@ -10,7 +10,6 @@ import UIKit
 class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
-        print("✅ ViewController.viewDidLoad 실행됨")
 
         view.backgroundColor = .systemBackground
 
@@ -27,5 +26,26 @@ class ViewController: UIViewController {
             label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             label.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
+
+        let loginButton = UIButton(type: .system)
+        loginButton.setTitle("로그인 하러 가기", for: .normal)
+        loginButton.setTitleColor(.white, for: .normal)
+        loginButton.backgroundColor = .systemGreen
+        loginButton.layer.cornerRadius = 10
+        loginButton.translatesAutoresizingMaskIntoConstraints = false
+        loginButton.addTarget(self, action: #selector(didTapLogin), for: .touchUpInside)
+        view.addSubview(loginButton)
+
+        NSLayoutConstraint.activate([
+            loginButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loginButton.topAnchor.constraint(equalTo: label.bottomAnchor, constant: 24),
+            loginButton.widthAnchor.constraint(equalToConstant: 180),
+            loginButton.heightAnchor.constraint(equalToConstant: 44)
+        ])
+    }
+
+    @objc private func didTapLogin() {
+        let loginVC = LoginViewController()
+        navigationController?.pushViewController(loginVC, animated: true)
     }
 }
