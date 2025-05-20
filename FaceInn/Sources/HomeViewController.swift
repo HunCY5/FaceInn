@@ -322,6 +322,7 @@ extension HomeViewController: UICollectionViewDataSource {
             guard let self = self else { return }
             let accommodation = self.filteredAccommodations[indexPath.item]
             let detailVC = AccommodationDetailViewController()
+            detailVC.hidesBottomBarWhenPushed = true
             detailVC.accommodation = accommodation
             self.navigationController?.pushViewController(detailVC, animated: true)
         }
