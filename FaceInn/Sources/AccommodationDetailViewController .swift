@@ -1,26 +1,27 @@
 //
-//  ViewController.swift
+//  AccommodationDetailViewController .swift
 //  FaceInn
 //
-//  Created by CHOI on 3/31/25.
+//  Created by 신찬솔 on 5/20/25.
 //
 
 import UIKit
 
-class ViewController: UIViewController {
+final class AccommodationDetailViewController: UIViewController {
+
+    var accommodation: Accommodation?
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        print("✅ ViewController.viewDidLoad 실행됨")
+        view.backgroundColor = .white
+        self.title = accommodation?.name
 
-        view.backgroundColor = .systemBackground
 
         let label = UILabel()
-        label.text = "👋 Hello, UIKit!"
-        label.textColor = .label
-        label.font = .systemFont(ofSize: 24, weight: .bold)
-        label.textAlignment = .center
+        label.text = "숙소 상세 페이지"
+        label.font = .systemFont(ofSize: 18)
+        label.textColor = .black
         label.translatesAutoresizingMaskIntoConstraints = false
-
         view.addSubview(label)
 
         NSLayoutConstraint.activate([
