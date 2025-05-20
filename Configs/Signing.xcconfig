@@ -1,0 +1,12 @@
+//
+//  Signing.xcconfig
+//  FaceInn
+//
+//  Created by 신찬솔 on 5/20/25.
+//
+
+// Configuration settings file format documentation can be found at:
+// https://developer.apple.com/documentation/xcode/adding-a-build-configuration-file-to-your-project
+
+CODE_SIGN_STYLE = Automatic
+DEVELOPMENT_TEAM = R54DJK7U34

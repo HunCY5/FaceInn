@@ -79,3 +79,5 @@ fastlane/test_output/
 
 # Firebase
 **/GoogleService-Info.plist
+Configs/Signing.xcconfig
+GoogleService-Info.plist
