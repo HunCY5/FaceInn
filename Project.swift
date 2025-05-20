@@ -1,9 +1,22 @@
 import ProjectDescription
 
+let baseSettings: SettingsDictionary = [
+  "OTHER_LDFLAGS": "$(inherited) -ObjC"
+]
+
+let projectSettings = Settings.settings(
+  base: baseSettings,
+  configurations: [
+    .debug(name: "Debug", xcconfig: "Configs/Signing.xcconfig"),
+    .release(name: "Release", xcconfig: "Configs/Signing.xcconfig")
+  ]
+)
+
 let project = Project(
   name: "FaceInn",
   packages: [
-    .package(url: "https://github.com/firebase/firebase-ios-sdk.git", .upToNextMajor(from: "10.15.0"))
+    .package(url: "https://github.com/firebase/firebase-ios-sdk.git", .upToNextMajor(from: "10.15.0")),
+    .package(url: "https://github.com/WenchaoD/FSCalendar", .upToNextMajor(from: "2.8.2"))
   ],
   targets: [
     .target(
@@ -32,20 +45,17 @@ let project = Project(
         ]
       ),
       sources: ["FaceInn/Sources/**"],
-      resources: ["FaceInn/Resources/**"],
+      resources: ["FaceInn/Resources/**", "FaceInn/GoogleService-Info.plist"],
       dependencies: [
         .package(product: "FirebaseAnalytics"),
         .package(product: "FirebaseAuth"),
         .package(product: "FirebaseFirestore"),
         .package(product: "FirebaseStorage"),
         .package(product: "FirebaseDatabase"),
-        .package(product: "FirebaseMessaging")
+        .package(product: "FirebaseMessaging"),
+        .package(product: "FSCalendar")
       ],
-      settings: .settings(
-        base: [
-          "OTHER_LDFLAGS": "$(inherited) -ObjC"
-        ]
-      )
+      settings: projectSettings
     ),
     .target(
       name: "FaceInnTests",
