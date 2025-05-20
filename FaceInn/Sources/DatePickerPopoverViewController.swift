@@ -44,15 +44,26 @@ final class DatePickerPopoverViewController: UIViewController, FSCalendarDelegat
         let savedStart = UserDefaults.standard.object(forKey: "selectedStartDate") as? Date
         let savedEnd = UserDefaults.standard.object(forKey: "selectedEndDate") as? Date
 
-        if let start = savedStart {
+        let today = Calendar.current.startOfDay(for: Date())
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today)!
+
+        if let start = savedStart, let end = savedEnd,
+           start >= today, end >= today {
             startDate = start
-            calendar.select(start)
-        }
-        if let end = savedEnd {
             endDate = end
+            calendar.select(start)
             calendar.select(end)
+        } else {
+            startDate = today
+            endDate = tomorrow
+            calendar.select(today)
+            calendar.select(tomorrow)
+            UserDefaults.standard.set(startDate, forKey: "selectedStartDate")
+            UserDefaults.standard.set(endDate, forKey: "selectedEndDate")
         }
         calendar.appearance.todayColor = .white
+        // 날짜 초기화 후 HomeViewController dateButton에 반영
+        onDateSelected?(startDate, endDate)
         calendar.appearance.titleTodayColor = UIColor.black
         calendar.appearance.borderRadius = 1.0
     }

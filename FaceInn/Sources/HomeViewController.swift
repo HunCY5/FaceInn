@@ -48,8 +48,9 @@ final class HomeViewController: UIViewController {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ko_KR")
         formatter.dateFormat = "M월 d일"
-        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
-        let title = "📅 \(formatter.string(from: Date())) - \(formatter.string(from: tomorrow))"
+        let today = Date()
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today)!
+        let title = "📅 \(formatter.string(from: today)) - \(formatter.string(from: tomorrow))"
         dateButton.setTitle(title, for: .normal)
         dateButton.contentHorizontalAlignment = .center
         dateButton.tintColor = .black
@@ -106,16 +107,6 @@ final class HomeViewController: UIViewController {
             locationButton.setTitle("📍 \(savedLocation)", for: .normal)
         }
 
-        if let dateButton = filterStackView.arrangedSubviews[1] as? UIButton {
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "ko_KR")
-            formatter.dateFormat = "M월 d일"
-            if let start = UserDefaults.standard.object(forKey: "selectedStartDate") as? Date,
-               let end = UserDefaults.standard.object(forKey: "selectedEndDate") as? Date {
-                let title = "📅 \(formatter.string(from: start)) - \(formatter.string(from: end))"
-                dateButton.setTitle(title, for: .normal)
-            }
-        }
 
         if let guestButton = filterStackView.arrangedSubviews[2] as? UIButton {
             let savedGuestCount = UserDefaults.standard.object(forKey: "selectedGuestCount") != nil ?
@@ -124,6 +115,14 @@ final class HomeViewController: UIViewController {
         }
 
         if let dateButton = filterStackView.arrangedSubviews[1] as? UIButton {
+            if let start = UserDefaults.standard.object(forKey: "selectedStartDate") as? Date,
+               let end = UserDefaults.standard.object(forKey: "selectedEndDate") as? Date {
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "ko_KR")
+                formatter.dateFormat = "M월 d일"
+                let title = "📅 \(formatter.string(from: start)) - \(formatter.string(from: end))"
+                dateButton.setTitle(title, for: .normal)
+            }
             dateButton.addTarget(self, action: #selector(dateButtonTapped(_:)), for: .touchUpInside)
         }
         setupKeyboardDismissal()
@@ -131,9 +130,10 @@ final class HomeViewController: UIViewController {
         NotificationCenter.default.addObserver(self, selector: #selector(handleAuthChanged), name: .AuthStateDidChange, object: nil)
     }
 
-@objc private func handleAuthChanged() {
-    collectionView.reloadData()
-}
+
+    @objc private func handleAuthChanged() {
+        fetchAccommodations()
+    }
 
     private func addDoneButtonOnKeyboard() {
         let doneToolbar: UIToolbar = UIToolbar()
@@ -206,9 +206,13 @@ final class HomeViewController: UIViewController {
             if let start = startDate, let end = endDate {
                 let title = "📅 \(formatter.string(from: start)) - \(formatter.string(from: end))"
                 sender.setTitle(title, for: .normal)
+                UserDefaults.standard.set(start, forKey: "selectedStartDate")
+                UserDefaults.standard.set(end, forKey: "selectedEndDate")
             } else if let start = startDate {
                 let title = "📅 \(formatter.string(from: start))"
                 sender.setTitle(title, for: .normal)
+                UserDefaults.standard.set(start, forKey: "selectedStartDate")
+                UserDefaults.standard.removeObject(forKey: "selectedEndDate")
             }
             self.fetchAccommodations()
         }
@@ -366,9 +370,15 @@ extension HomeViewController: UISearchBarDelegate {
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         searchBar.resignFirstResponder()
     }
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        fetchAccommodations()
+    }
 }
 
 
 extension Notification.Name {
     static let AuthStateDidChange = Notification.Name("AuthStateDidChange")
 }
+
+   
