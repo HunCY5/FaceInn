@@ -7,10 +7,15 @@
 
 import UIKit
 
+protocol LoginDelegate: AnyObject {
+    func didLoginSuccessfully()
+}
+
 final class LoginViewController: UIViewController {
 
     private let loginView = LoginView()
     private let loginModel = LoginModel()
+    weak var delegate: LoginDelegate?
 
     override func loadView() {
         view = loginView
@@ -18,6 +23,8 @@ final class LoginViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        title = "로그인"
+        view.backgroundColor = .white
         loginView.signupButton.addTarget(self, action: #selector(didTapSignup), for: .touchUpInside)
         loginView.loginButton.addTarget(self, action: #selector(didTapLogin), for: .touchUpInside)
     }
@@ -34,14 +41,8 @@ final class LoginViewController: UIViewController {
             DispatchQueue.main.async {
                 switch result {
                 case .success:
-                    let myPageVC = ProfileViewController()
-                    let nav = UINavigationController(rootViewController: myPageVC)
-                    if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                       let sceneDelegate = scene.delegate as? SceneDelegate,
-                       let window = sceneDelegate.window {
-                        window.rootViewController = nav
-                        window.makeKeyAndVisible()
-                    }
+                    self?.delegate?.didLoginSuccessfully()
+                    self?.navigationController?.popViewController(animated: true)
                 case .failure(let error):
                     self?.showAlert(title: "로그인 실패", message: error.localizedDescription)
                 }
