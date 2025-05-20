@@ -22,22 +22,32 @@ final class ProfileViewController: UIViewController {
         title = "프로필"
         view.backgroundColor = .white
         profileView.loginButton.addTarget(self, action: #selector(didTapLogin), for: .touchUpInside)
+        profileView.logoutButton.addTarget(self, action: #selector(didTapLogout), for: .touchUpInside)
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        
         updateLoginUI()
     }
 
     private func updateLoginUI() {
-        if Auth.auth().currentUser != nil {
-            profileView.loginButton.setTitle("로그인 완료", for: .normal)
-            profileView.loginButton.isEnabled = false
-            profileView.loginButton.alpha = 0.5
-        } else {
-            profileView.loginButton.setTitle("로그인", for: .normal)
-            profileView.loginButton.isEnabled = true
-            profileView.loginButton.alpha = 1.0
+        DispatchQueue.main.async {
+            if let user = Auth.auth().currentUser {
+                if user.isAnonymous {
+                    self.profileView.loginButton.setTitle("로그인", for: .normal)
+                    self.profileView.loginButton.isEnabled = true
+                    self.profileView.loginButton.alpha = 1.0
+                } else {
+                    self.profileView.loginButton.setTitle("로그인 완료", for: .normal)
+                    self.profileView.loginButton.isEnabled = false
+                    self.profileView.loginButton.alpha = 0.5
+                }
+            } else {
+                self.profileView.loginButton.setTitle("로그인", for: .normal)
+                self.profileView.loginButton.isEnabled = true
+                self.profileView.loginButton.alpha = 1.0
+            }
         }
     }
 
@@ -45,6 +55,15 @@ final class ProfileViewController: UIViewController {
         let loginVC = LoginViewController()
         loginVC.delegate = self
         navigationController?.pushViewController(loginVC, animated: true)
+    }
+
+    @objc private func didTapLogout() {
+        do {
+            try Auth.auth().signOut()
+            updateLoginUI()
+        } catch {
+            print("로그아웃 실패: \(error.localizedDescription)")
+        }
     }
 }
 

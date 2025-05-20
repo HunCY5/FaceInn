@@ -16,6 +16,7 @@ final class LoginViewController: UIViewController {
     private let loginView = LoginView()
     private let loginModel = LoginModel()
     weak var delegate: LoginDelegate?
+    var onLoginSuccess: (() -> Void)?
 
     override func loadView() {
         view = loginView
@@ -41,7 +42,7 @@ final class LoginViewController: UIViewController {
             DispatchQueue.main.async {
                 switch result {
                 case .success:
-                    self?.delegate?.didLoginSuccessfully()
+                    self?.onLoginSuccess?()
                     self?.navigationController?.popViewController(animated: true)
                 case .failure(let error):
                     self?.showAlert(title: "로그인 실패", message: error.localizedDescription)

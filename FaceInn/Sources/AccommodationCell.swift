@@ -18,6 +18,12 @@ final class AccommodationCell: UICollectionViewCell {
         }
     }
 
+    var onLikeRequested: (() -> Void)? {
+        didSet {
+            cardView.onLikeRequested = onLikeRequested
+        }
+    }
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         contentView.addSubview(cardView)
@@ -36,5 +42,9 @@ final class AccommodationCell: UICollectionViewCell {
 
     func configure(with model: Accommodation) {
         cardView.configure(with: model)
+    }
+
+    func toggleLike() {
+        cardView.toggleLike()
     }
 }

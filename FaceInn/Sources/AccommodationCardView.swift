@@ -7,6 +7,8 @@
 
 import UIKit
 import FirebaseStorage
+import FirebaseAuth
+import FirebaseFirestore
 
 final class AccommodationCardView: UIView {
 
@@ -20,6 +22,7 @@ final class AccommodationCardView: UIView {
     private var isLiked = false
     
     var onCardTapped: (() -> Void)?
+    var onLikeRequested: (() -> Void)?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -72,11 +75,29 @@ final class AccommodationCardView: UIView {
         self.isUserInteractionEnabled = true
     }
     @objc private func heartButtonTapped() {
-           isLiked.toggle()
-           let heartImageName = isLiked ? "heart.fill" : "heart"
-           heartButton.setImage(UIImage(systemName: heartImageName), for: .normal)
-           heartButton.tintColor = isLiked ? .systemRed : .gray
-       }
+        guard let user = Auth.auth().currentUser, !user.isAnonymous else {
+            onLikeRequested?()
+            return
+        }
+        
+        isLiked.toggle()
+        let heartImageName = isLiked ? "heart.fill" : "heart"
+        heartButton.setImage(UIImage(systemName: heartImageName), for: .normal)
+        heartButton.tintColor = isLiked ? .systemRed : .gray
+    }
+
+    // Public method to allow external triggering of like toggling
+    func toggleLike() {
+        guard let user = Auth.auth().currentUser, !user.isAnonymous else {
+            onLikeRequested?()
+            return
+        }
+
+        isLiked.toggle()
+        let heartImageName = isLiked ? "heart.fill" : "heart"
+        heartButton.setImage(UIImage(systemName: heartImageName), for: .normal)
+        heartButton.tintColor = isLiked ? .systemRed : .gray
+    }
     
     @objc private func cardTapped() {
         onCardTapped?()
@@ -188,17 +209,42 @@ final class AccommodationCardView: UIView {
 
         if let urlString = model.imageURLs?.first, let url = URL(string: urlString) {
             print("📸 이미지 URL 시도: \(urlString)")
+            // Remove existing activity indicators
+            imageView.subviews.forEach { if $0 is UIActivityIndicatorView { $0.removeFromSuperview() } }
+
+            // Set loading animation before starting image load
+            imageView.image = nil
+            let activity = UIActivityIndicatorView(style: .medium)
+            activity.color = .darkGray
+            activity.translatesAutoresizingMaskIntoConstraints = false
+            imageView.addSubview(activity)
+            NSLayoutConstraint.activate([
+                activity.centerXAnchor.constraint(equalTo: imageView.centerXAnchor),
+                activity.centerYAnchor.constraint(equalTo: imageView.centerYAnchor)
+            ])
+            activity.startAnimating()
+
             URLSession.shared.dataTask(with: url) { data, _, error in
                 if let error = error {
                     print("❌ 이미지 다운로드 실패: \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        activity.stopAnimating()
+                        activity.removeFromSuperview()
+                    }
                     return
                 }
                 guard let data = data else {
                     print("❗️ 이미지 데이터가 없음")
+                    DispatchQueue.main.async {
+                        activity.stopAnimating()
+                        activity.removeFromSuperview()
+                    }
                     return
                 }
                 DispatchQueue.main.async {
                     self.imageView.image = UIImage(data: data)
+                    activity.stopAnimating()
+                    activity.removeFromSuperview()
                     print("✅ 이미지 적용 완료")
                 }
             }.resume()
