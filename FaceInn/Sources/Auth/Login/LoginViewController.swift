@@ -34,7 +34,7 @@ final class LoginViewController: UIViewController {
             DispatchQueue.main.async {
                 switch result {
                 case .success:
-                    let myPageVC = MyPageViewController()
+                    let myPageVC = ProfileViewController()
                     let nav = UINavigationController(rootViewController: myPageVC)
                     if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                        let sceneDelegate = scene.delegate as? SceneDelegate,
