@@ -19,7 +19,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     ) -> Bool {
         // Firebase 초기화
         FirebaseApp.configure()
-        
+        UINavigationBar.appearance().tintColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
         if let user = Auth.auth().currentUser {
             print("✅ 로그인됨: \(user.uid)")
             print("이메일: \(user.email ?? "없음")")
@@ -44,4 +44,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     ) -> UISceneConfiguration {
         UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
     }
+    
 }
+        
