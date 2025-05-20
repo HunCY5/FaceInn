@@ -126,6 +126,20 @@ final class HomeViewController: UIViewController {
         if let dateButton = filterStackView.arrangedSubviews[1] as? UIButton {
             dateButton.addTarget(self, action: #selector(dateButtonTapped(_:)), for: .touchUpInside)
         }
+        setupKeyboardDismissal()
+        addDoneButtonOnKeyboard()
+    }
+
+    private func addDoneButtonOnKeyboard() {
+        let doneToolbar: UIToolbar = UIToolbar()
+        doneToolbar.sizeToFit()
+        
+        let flexSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+        let done: UIBarButtonItem = UIBarButtonItem(title: "닫기", style: .done, target: self, action: #selector(dismissKeyboard))
+        
+        doneToolbar.items = [flexSpace, done]
+        doneToolbar.isUserInteractionEnabled = true
+        searchBar.inputAccessoryView = doneToolbar
     }
 
     @objc private func guestButtonTapped(_ sender: UIButton) {
@@ -273,6 +287,16 @@ final class HomeViewController: UIViewController {
             }
         }
     }
+
+    private func setupKeyboardDismissal() {
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        tapGesture.cancelsTouchesInView = false
+        view.addGestureRecognizer(tapGesture)
+    }
+
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
+    }
 }
 
 extension HomeViewController: UICollectionViewDataSource {
@@ -313,5 +337,9 @@ extension HomeViewController: UISearchBarDelegate {
             }
         }
         collectionView.reloadData()
+    }
+
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        searchBar.resignFirstResponder()
     }
 }
