@@ -56,6 +56,8 @@ final class WishlistViewController: UIViewController {
         view.subviews.filter { $0 is UILabel && ($0 as? UILabel)?.text == "로그인 후 이용해주세요" }.forEach { $0.removeFromSuperview() }
 
         guard let user = Auth.auth().currentUser, !user.isAnonymous else {
+            view.subviews.filter { $0 is UILabel && ($0 as? UILabel)?.text == "숙소를 검색하고 찜목록에 추가하세요" }.forEach { $0.removeFromSuperview() }
+
             let label = UILabel()
             label.text = "로그인 후 이용해주세요"
             label.textAlignment = .center
