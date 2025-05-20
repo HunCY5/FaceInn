@@ -60,6 +60,9 @@ final class AccommodationCardView: UIView {
 
         heartButton.setImage(UIImage(systemName: "heart"), for: .normal)
         heartButton.tintColor = .gray
+        heartButton.backgroundColor = UIColor.white.withAlphaComponent(0.8)
+        heartButton.layer.cornerRadius = 18
+        heartButton.clipsToBounds = true
         addSubview(heartButton)
         
         heartButton.addTarget(self, action: #selector(heartButtonTapped), for: .touchUpInside)
@@ -90,8 +93,10 @@ final class AccommodationCardView: UIView {
             imageView.trailingAnchor.constraint(equalTo: trailingAnchor),
             imageView.heightAnchor.constraint(equalToConstant: 200),
 
-            heartButton.topAnchor.constraint(equalTo: imageView.topAnchor, constant: 8),
-            heartButton.trailingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: -8),
+            heartButton.topAnchor.constraint(equalTo: imageView.topAnchor, constant: 12),
+            heartButton.trailingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: -12),
+            heartButton.widthAnchor.constraint(equalToConstant: 36),
+            heartButton.heightAnchor.constraint(equalToConstant: 36),
 
             nameLabel.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 8),
             nameLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),

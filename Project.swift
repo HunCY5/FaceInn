@@ -1,5 +1,17 @@
 import ProjectDescription
 
+let baseSettings: SettingsDictionary = [
+  "OTHER_LDFLAGS": "$(inherited) -ObjC"
+]
+
+let projectSettings = Settings.settings(
+  base: baseSettings,
+  configurations: [
+    .debug(name: "Debug", xcconfig: "Configs/Signing.xcconfig"),
+    .release(name: "Release", xcconfig: "Configs/Signing.xcconfig")
+  ]
+)
+
 let project = Project(
   name: "FaceInn",
   packages: [
@@ -33,7 +45,7 @@ let project = Project(
         ]
       ),
       sources: ["FaceInn/Sources/**"],
-      resources: ["FaceInn/Resources/**"],
+      resources: ["FaceInn/Resources/**", "FaceInn/GoogleService-Info.plist"],
       dependencies: [
         .package(product: "FirebaseAnalytics"),
         .package(product: "FirebaseAuth"),
@@ -42,11 +54,7 @@ let project = Project(
         .package(product: "FirebaseDatabase"),
         .package(product: "FSCalendar")
       ],
-      settings: .settings(
-        base: [
-          "OTHER_LDFLAGS": "$(inherited) -ObjC"
-        ]
-      )
+      settings: projectSettings
     ),
     .target(
       name: "FaceInnTests",
