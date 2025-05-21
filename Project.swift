@@ -16,7 +16,8 @@ let project = Project(
   name: "FaceInn",
   packages: [
     .package(url: "https://github.com/firebase/firebase-ios-sdk.git", .upToNextMajor(from: "10.15.0")),
-    .package(url: "https://github.com/WenchaoD/FSCalendar", .upToNextMajor(from: "2.8.2"))
+    .package(url: "https://github.com/WenchaoD/FSCalendar", .upToNextMajor(from: "2.8.2")),
+    .package(url: "https://github.com/onevcat/Kingfisher.git", .upToNextMajor(from: "8.3.2")),
   ],
   targets: [
     .target(
@@ -31,6 +32,7 @@ let project = Project(
             "UIColorName": "",
             "UIImageName": "",
           ],
+          "UIUserInterfaceStyle": "Light",
           "UIApplicationSceneManifest": [
             "UIApplicationSupportsMultipleScenes": false,
             "UISceneConfigurations": [
@@ -53,7 +55,8 @@ let project = Project(
         .package(product: "FirebaseStorage"),
         .package(product: "FirebaseDatabase"),
         .package(product: "FirebaseMessaging"),
-        .package(product: "FSCalendar")
+        .package(product: "FSCalendar"),
+        .package(product: "Kingfisher"),
       ],
       settings: projectSettings
     ),

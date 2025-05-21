@@ -274,7 +274,10 @@ final class HomeViewController: UIViewController {
                     rating: data["rating"] as? Double ?? 0.0,
                     reviewCount: data["reviewCount"] as? Int ?? 0,
                     imageURLs: data["imageURLs"] as? [String],
-                    rooms: data["rooms"] as? [[String: Any]]
+                    rooms: data["rooms"] as? [[String: Any]],
+                    amenities: data["amenities"] as? [String],
+                    description: data["description"] as? String ?? "",
+                    hostId: data["hostId"] as? String ?? ""
                 )
             }
             let guestCount = UserDefaults.standard.object(forKey: "selectedGuestCount") != nil ?
@@ -305,6 +308,25 @@ final class HomeViewController: UIViewController {
 
     @objc private func dismissKeyboard() {
         view.endEditing(true)
+    }
+
+    private func updateDateAndGuestButtonTitles() {
+        if let guestButton = filterStackView.arrangedSubviews[2] as? UIButton {
+            let savedGuestCount = UserDefaults.standard.object(forKey: "selectedGuestCount") != nil ?
+                UserDefaults.standard.integer(forKey: "selectedGuestCount") : 2
+            guestButton.setTitle("👥 \(savedGuestCount)명", for: .normal)
+        }
+
+        if let dateButton = filterStackView.arrangedSubviews[1] as? UIButton {
+            if let start = UserDefaults.standard.object(forKey: "selectedStartDate") as? Date,
+               let end = UserDefaults.standard.object(forKey: "selectedEndDate") as? Date {
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "ko_KR")
+                formatter.dateFormat = "M월 d일"
+                let title = "📅 \(formatter.string(from: start)) - \(formatter.string(from: end))"
+                dateButton.setTitle(title, for: .normal)
+            }
+        }
     }
 }
 
@@ -373,6 +395,7 @@ extension HomeViewController: UISearchBarDelegate {
     }
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        updateDateAndGuestButtonTitles()
         fetchAccommodations()
     }
 }

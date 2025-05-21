@@ -16,6 +16,10 @@ let dependencies = Dependencies(
     .remote(
       url: "https://github.com/WenchaoD/FSCalendar",
       requirement: .upToNextMajor(from: "2.8.2")
+    ),
+    .remote(
+      url: "https://github.com/onevcat/Kingfisher.git",
+      requirement: .upToNextMajor(from: "7.0.0")
     )
   ],
   platforms: [.iOS]
