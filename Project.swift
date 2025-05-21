@@ -32,6 +32,7 @@ let project = Project(
             "UIColorName": "",
             "UIImageName": "",
           ],
+          "UIUserInterfaceStyle": "Light",
           "UIApplicationSceneManifest": [
             "UIApplicationSupportsMultipleScenes": false,
             "UISceneConfigurations": [
