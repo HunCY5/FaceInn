@@ -11,6 +11,7 @@ import UIKit
 
 final class FaceGuideOverlayView: UIView {
 
+    // 현재 촬영할 얼굴 방향에 따라 안내 텍스트를 화면 상단에 표시하는 레이블
     private let guidanceLabel: UILabel = {
         let label = UILabel()
         label.textAlignment = .center
@@ -20,18 +21,21 @@ final class FaceGuideOverlayView: UIView {
         return label
     }()
 
+    // 얼굴 인식 여부에 따라 가이드 프레임 색상을 변경 (녹색: 인식됨, 빨간색: 인식 안됨)
     var strokeColor: UIColor = .systemGreen {
         didSet {
             setNeedsDisplay()
         }
     }
 
+    // 얼굴 방향을 나타내는 열거형 (정면, 좌측, 우측)
     enum FacePosition: String, CaseIterable {
         case front = "front"
         case left = "left"
         case right = "right"
     }
 
+    // 현재 촬영 중인 얼굴 위치 (변경되면 프레임 및 텍스트 갱신)
     var currentPosition: FacePosition = .front {
         didSet {
             setNeedsDisplay()
@@ -55,6 +59,7 @@ final class FaceGuideOverlayView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    // 얼굴 가이드 이미지를 현재 위치에 따라 해당하는 이미지와 크기로 화면에 그림
     override func draw(_ rect: CGRect) {
         guard let context = UIGraphicsGetCurrentContext() else { return }
 
@@ -106,6 +111,7 @@ final class FaceGuideOverlayView: UIView {
 
         image.draw(in: imageRect, blendMode: .normal, alpha: 1.0)
     }
+    // 현재 얼굴 위치에 따라 상단에 표시되는 안내 문구를 업데이트
     private func updateGuidanceText() {
         switch currentPosition {
         case .front:
