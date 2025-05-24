@@ -161,18 +161,18 @@ final class ProfileView: UIView {
         faceIDIcon.heightAnchor.constraint(equalToConstant: 48).isActive = true
 
         // Face ID 라벨
-        faceIDLabel.text = "페이스 아이디"
+        faceIDLabel.text = "얼굴 정보"
         faceIDLabel.font = .boldSystemFont(ofSize: 17)
 
         // Face ID 서브라벨
-        faceIDSubLabel.text = "얼굴 인식을 통해 빠르고 편리하게 체크인할 수 있습니다."
+        faceIDSubLabel.text = "얼굴 정보를 통해 빠르고 편리하게 체크인할 수 있습니다."
         faceIDSubLabel.font = .systemFont(ofSize: 13)
         faceIDSubLabel.textColor = .gray
         faceIDSubLabel.textAlignment = .center
         faceIDSubLabel.numberOfLines = 0
 
         let bottomText = UILabel()
-        bottomText.text = "로그인 후 페이스 아이디를 등록하면 빠른 체크인이 가능합니다."
+        bottomText.text = "로그인 후 얼굴 정보를 등록하면 빠른 체크인이 가능합니다."
         bottomText.font = .systemFont(ofSize: 13)
         bottomText.textColor = .gray
         bottomText.textAlignment = .center
@@ -385,10 +385,10 @@ final class ProfileView: UIView {
         faceIDTextStack.spacing = 4
         faceIDTextStack.alignment = .leading
 
-        faceIDLabel.text = "페이스 아이디 미등록"
+        faceIDLabel.text = "얼굴 정보 미등록"
         faceIDLabel.font = .boldSystemFont(ofSize: 14)
 
-        faceIDSubLabel.text = "얼굴 인식을 등록하면 빠른 체크인이 가능합니다."
+        faceIDSubLabel.text = "얼굴 정보를 등록하면 \n빠른 체크인이 가능합니다."
         faceIDSubLabel.font = .systemFont(ofSize: 13)
         faceIDSubLabel.textColor = .gray
 
@@ -503,3 +503,5 @@ final class ProfileView: UIView {
         userViewStack.isHidden = !isLoggedIn
     }
 }
+
+
