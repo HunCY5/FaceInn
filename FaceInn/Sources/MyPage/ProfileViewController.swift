@@ -9,6 +9,7 @@
 import UIKit
 import FirebaseAuth
 import FirebaseFirestore
+import AVFoundation
 
 final class ProfileViewController: UIViewController {
 
@@ -24,6 +25,7 @@ final class ProfileViewController: UIViewController {
         profileView.loginButton.addTarget(self, action: #selector(didTapLogin), for: .touchUpInside)
         profileView.faceIDLoginButton.addTarget(self, action: #selector(didTapLogin), for: .touchUpInside)
         profileView.logoutButton.addTarget(self, action: #selector(didTapLogout), for: .touchUpInside)
+        profileView.faceIDRegisterButton.addTarget(self, action: #selector(didTapFaceIDRegister), for: .touchUpInside)
         updateView()
     }
 
@@ -63,4 +65,47 @@ final class ProfileViewController: UIViewController {
             print("Logout failed: \(error.localizedDescription)")
         }
     }
+    
+    @objc private func didTapFaceIDRegister() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            let vc = FaceCaptureViewController()
+            navigationController?.pushViewController(vc, animated: true)
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        let vc = FaceCaptureViewController()
+                        self.navigationController?.pushViewController(vc, animated: true)
+                    } else {
+                        self.showCameraAccessAlert()
+                    }
+                }
+            }
+        case .denied, .restricted:
+            showCameraAccessAlert()
+        @unknown default:
+            break
+        }
+    }
+
+    private func showCameraAccessAlert() {
+        let alert = UIAlertController(
+            title: "카메라 권한 필요",
+            message: "얼굴 정보 등록을 위해 설정에서 카메라 접근 권한을 허용해주세요.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alert.addAction(UIAlertAction(title: "설정으로 이동", style: .default, handler: { _ in
+            if let url = URL(string: UIApplication.openSettingsURLString),
+               UIApplication.shared.canOpenURL(url) {
+                UIApplication.shared.open(url)
+            }
+        }))
+        present(alert, animated: true)
+    }
+}
+
+#Preview{
+    ProfileViewController()
 }
