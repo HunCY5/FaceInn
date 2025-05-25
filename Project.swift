@@ -33,6 +33,7 @@ let project = Project(
             "UIImageName": "",
           ],
           "UIUserInterfaceStyle": "Light",
+          "NSCameraUsageDescription": "얼굴 정보를 등록하려면 카메라 접근이 필요합니다.",
           "UIApplicationSceneManifest": [
             "UIApplicationSupportsMultipleScenes": false,
             "UISceneConfigurations": [
