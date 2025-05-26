@@ -26,6 +26,17 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
     private var upcomingReservations: [[String: Any]] = []
     private var pastReservations: [[String: Any]] = []
     private let tableView = UITableView()
+    
+    private let emptyLabel: UILabel = {
+        let label = UILabel()
+        label.text = "예약 내역이 없습니다."
+        label.textColor = .lightGray
+        label.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.isHidden = true
+        return label
+    }()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -39,6 +50,11 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
         ])
         segmentControl.addTarget(self, action: #selector(segmentChanged), for: .valueChanged)
         setupTableView()
+        view.addSubview(emptyLabel)
+        NSLayoutConstraint.activate([
+            emptyLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            emptyLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
         fetchReservations()
         NotificationCenter.default.addObserver(self, selector: #selector(handleReservationCancelled), name: NSNotification.Name("ReservationCancelled"), object: nil)
     }
@@ -79,7 +95,18 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
             }
             DispatchQueue.main.async {
                 self.tableView.reloadData()
+                self.updateEmptyLabelText()
             }
+        }
+    }
+
+    private func updateEmptyLabelText() {
+        if selectedTab == 0 {
+            emptyLabel.text = "예약 내역이 없습니다."
+            emptyLabel.isHidden = !upcomingReservations.isEmpty
+        } else {
+            emptyLabel.text = "이용 내역이 없습니다."
+            emptyLabel.isHidden = !pastReservations.isEmpty
         }
     }
 
@@ -123,6 +150,7 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
     @objc private func segmentChanged(_ sender: UISegmentedControl) {
         selectedTab = sender.selectedSegmentIndex
         tableView.reloadData()
+        updateEmptyLabelText()
     }
 
     @objc private func handleReservationCancelled() {
