@@ -69,6 +69,7 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(ReservationCell.self, forCellReuseIdentifier: "Cell")
+        tableView.allowsSelection = false
         view.addSubview(tableView)
         NSLayoutConstraint.activate([
             tableView.topAnchor.constraint(equalTo: segmentControl.bottomAnchor, constant: 8),
@@ -171,8 +172,18 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
             : .lightGray
         cell.documentId = reservation["documentId"] as? String
 
+        // Hide buttons if selectedTab == 1 (이용후)
+        if selectedTab == 1 {
+            cell.faceCheckinButton.isHidden = true
+            cell.disableFaceIdButton.isHidden = true
+        } else {
+            cell.faceCheckinButton.isHidden = false
+            cell.disableFaceIdButton.isHidden = false
+        }
+
         return cell
     }
+
 
     @objc private func segmentChanged(_ sender: UISegmentedControl) {
         selectedTab = sender.selectedSegmentIndex
@@ -259,6 +270,16 @@ class ReservationCell: UITableViewCell {
         disableFaceIdButton.translatesAutoresizingMaskIntoConstraints = false
         disableFaceIdButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
         disableFaceIdButton.addTarget(self, action: #selector(handleDisableFaceIdTapped), for: .touchUpInside)
+
+        // 버튼 터치 애니메이션 효과 추가 (각 버튼에 명시적으로 이벤트 추가)
+        faceCheckinButton.addTarget(self, action: #selector(buttonTouchDown(_:)), for: .touchDown)
+        faceCheckinButton.addTarget(self, action: #selector(buttonTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+
+        disableFaceIdButton.addTarget(self, action: #selector(buttonTouchDown(_:)), for: .touchDown)
+        disableFaceIdButton.addTarget(self, action: #selector(buttonTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+
+        cancelButton.addTarget(self, action: #selector(buttonTouchDown(_:)), for: .touchDown)
+        cancelButton.addTarget(self, action: #selector(buttonTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
 
         // 수평 스택
         let dateStack = UIStackView()
@@ -416,5 +437,26 @@ class ReservationCell: UITableViewCell {
         })
         viewController.present(confirmAlert, animated: true)
     }
-}
 
+    @objc private func buttonTouchDown(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.15,
+                       delay: 0,
+                       usingSpringWithDamping: 0.4,
+                       initialSpringVelocity: 6,
+                       options: .curveEaseInOut,
+                       animations: {
+            sender.transform = CGAffineTransform(scaleX: 0.93, y: 0.93)
+        }, completion: nil)
+    }
+
+    @objc private func buttonTouchUp(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.25,
+                       delay: 0,
+                       usingSpringWithDamping: 0.5,
+                       initialSpringVelocity: 2,
+                       options: .curveEaseOut,
+                       animations: {
+            sender.transform = .identity
+        }, completion: nil)
+    }
+}
