@@ -96,16 +96,26 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
                 return
             }
             let now = Date()
-            self.upcomingReservations = []
-            self.pastReservations = []
+            var upcoming: [[String: Any]] = []
+            var past: [[String: Any]] = []
             for doc in documents {
                 var data = doc.data()
                 data["documentId"] = doc.documentID
                 if let end = (data["endDate"] as? Timestamp)?.dateValue(), end > now {
-                    self.upcomingReservations.append(data)
+                    upcoming.append(data)
                 } else {
-                    self.pastReservations.append(data)
+                    past.append(data)
                 }
+            }
+            self.upcomingReservations = upcoming.sorted {
+                let date1 = ($0["startDate"] as? Timestamp)?.dateValue() ?? Date.distantFuture
+                let date2 = ($1["startDate"] as? Timestamp)?.dateValue() ?? Date.distantFuture
+                return date1 < date2
+            }
+            self.pastReservations = past.sorted {
+                let date1 = ($0["endDate"] as? Timestamp)?.dateValue() ?? Date.distantPast
+                let date2 = ($1["endDate"] as? Timestamp)?.dateValue() ?? Date.distantPast
+                return date1 > date2
             }
             DispatchQueue.main.async {
                 self.tableView.reloadData()
