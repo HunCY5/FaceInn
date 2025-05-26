@@ -11,7 +11,7 @@ import Kingfisher
 import FirebaseAuth
 import FirebaseFirestore
 
-final class ReservationViewController: UIViewController {
+final class ReservationViewController: UIViewController, UITextFieldDelegate {
     
     var accommodation: Accommodation?
     var room: AccommodationRoom?
@@ -159,7 +159,16 @@ final class ReservationViewController: UIViewController {
         nameField.placeholder = "이름"
         phoneField.borderStyle = .roundedRect
         phoneField.placeholder = "휴대폰 번호"
-        phoneField.keyboardType = .phonePad
+        phoneField.keyboardType = .numberPad
+        // 키보드 상단에 완료 버튼 툴바 추가
+        let toolbar = UIToolbar()
+        toolbar.sizeToFit()
+        let flexSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+        let doneButton = UIBarButtonItem(title: "완료", style: .done, target: self, action: #selector(dismissKeyboard))
+        toolbar.items = [flexSpace, doneButton]
+        phoneField.inputAccessoryView = toolbar
+        nameField.delegate = self
+        phoneField.delegate = self
         // Firebase Firestore에서 사용자 정보 불러오기
         if let user = Auth.auth().currentUser {
             let db = Firestore.firestore()
@@ -286,6 +295,11 @@ final class ReservationViewController: UIViewController {
             mainStack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -24),
             mainStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 24),
         ])
+
+        // Add tap gesture to dismiss keyboard
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        tapGesture.cancelsTouchesInView = false
+        view.addGestureRecognizer(tapGesture)
     }
     
     @objc private func saveReservationToFirestore() {
@@ -353,6 +367,15 @@ final class ReservationViewController: UIViewController {
         payButton.isEnabled = isNameFilled && isPhoneFilled
         payButton.alpha = payButton.isEnabled ? 1.0 : 0.5
     }
+
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
+    }
+
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
+        return true
+    }
 }
 
 private extension Int {
@@ -362,4 +385,3 @@ private extension Int {
         return formatter.string(from: NSNumber(value: self)) ?? "\(self)"
     }
 }
-
