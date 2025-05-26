@@ -84,8 +84,12 @@ final class ProfileViewController: UIViewController {
                                 .whereField("useFaceId", isEqualTo: true)
                                 .getDocuments { snapshot, error in
                                     guard let documents = snapshot?.documents else { return }
+                                    let now = Date()
                                     for doc in documents {
-                                        reservesRef.document(doc.documentID).updateData(["useFaceId": false])
+                                        if let endDate = (doc.data()["endDate"] as? Timestamp)?.dateValue(),
+                                           endDate > now {
+                                            reservesRef.document(doc.documentID).updateData(["useFaceId": false])
+                                        }
                                     }
                                 }
                         }
