@@ -1,3 +1,7 @@
+// 얼굴 등록 완료 델리게이트 프로토콜
+protocol FaceCaptureDelegate: AnyObject {
+    func faceCaptureDidFinish()
+}
 //
 //  ReservationViewController.swift
 //  FaceInn
@@ -22,6 +26,10 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
     private let nameField = UITextField()
     private let phoneField = UITextField()
     private let payButton = UIButton(type: .system)
+    // 얼굴인식 체크박스 관련
+    private let faceIdSwitch = UISwitch()
+    private let faceIdLabel = UILabel()
+    private var faceIdAvailable = false
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -179,6 +187,12 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
                     let data = document.data()
                     self.nameField.text = data?["name"] as? String
                     self.phoneField.text = data?["phoneNumber"] as? String
+                    // 얼굴 벡터 유무로 얼굴인식 체크박스 활성화
+                    let front = data?["front_vector"]
+                    let left = data?["left_vector"]
+                    let right = data?["right_vector"]
+                    self.faceIdAvailable = front != nil || left != nil || right != nil
+                    self.faceIdSwitch.setOn(self.faceIdAvailable, animated: false)
                     self.updatePayButtonState()
                 } else {
                     print("사용자 문서를 찾을 수 없습니다: \(error?.localizedDescription ?? "알 수 없는 오류")")
@@ -285,6 +299,19 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
         mainStack.addArrangedSubview(reservationInfoLabel)
         mainStack.addArrangedSubview(nameField)
         mainStack.addArrangedSubview(phoneField)
+        // 얼굴인식 체크박스 UI 추가
+        faceIdLabel.text = "얼굴인식으로 체크인"
+        faceIdLabel.font = .systemFont(ofSize: 14)
+        faceIdLabel.translatesAutoresizingMaskIntoConstraints = false
+        faceIdSwitch.translatesAutoresizingMaskIntoConstraints = false
+        // 얼굴인식 스위치 값 변경 감지 액션 추가
+        faceIdSwitch.addTarget(self, action: #selector(handleFaceIdSwitchChanged), for: .valueChanged)
+        let faceIdStack = UIStackView(arrangedSubviews: [faceIdLabel, faceIdSwitch])
+        faceIdStack.axis = .horizontal
+        faceIdStack.spacing = 8
+        faceIdStack.alignment = .center
+        faceIdStack.translatesAutoresizingMaskIntoConstraints = false
+        mainStack.addArrangedSubview(faceIdStack)
         mainStack.addArrangedSubview(totalPaymentStack)
         mainStack.addArrangedSubview(payButton)
 
@@ -329,7 +356,8 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
             "totalPrice": totalPrice,
             "createdAt": FieldValue.serverTimestamp(),
             "accommodationName": accommodation.name,
-            "imageURL": room.imageURLs.first ?? ""
+            "imageURL": room.imageURLs.first ?? "",
+            "useFaceId": faceIdSwitch.isOn && faceIdAvailable
         ]
 
         Firestore.firestore().collection("reserves").addDocument(data: reservationData) { error in
@@ -375,6 +403,30 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         textField.resignFirstResponder()
         return true
+    }
+    
+    @objc private func handleFaceIdSwitchChanged(_ sender: UISwitch) {
+        if sender.isOn && !faceIdAvailable {
+            let alert = UIAlertController(title: "얼굴 정보 필요", message: "얼굴을 등록해주세요.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "취소", style: .cancel, handler: { _ in
+                sender.setOn(false, animated: true)
+            }))
+            alert.addAction(UIAlertAction(title: "확인", style: .default, handler: { _ in
+                let faceCaptureVC = FaceCaptureViewController()
+                faceCaptureVC.modalPresentationStyle = .fullScreen
+                faceCaptureVC.delegate = self
+                self.present(faceCaptureVC, animated: true)
+            }))
+            present(alert, animated: true)
+        }
+    }
+}
+
+// 얼굴 등록 완료 델리게이트 구현
+extension ReservationViewController: FaceCaptureDelegate {
+    func faceCaptureDidFinish() {
+        self.faceIdAvailable = true
+        self.faceIdSwitch.setOn(true, animated: true)
     }
 }
 

@@ -157,7 +157,18 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
             cell.thumbnailImageView.image = UIImage(named: "placeholder")
         }
 
+        let useFaceId = reservation["useFaceId"] as? Bool ?? false
+        cell.faceIdStatusLabel.text = useFaceId ? "얼굴인식 체크인 사용" : "얼굴인식 체크인 사용 안함"
+
         cell.showCancelButton(selectedTab == 0)
+        cell.faceCheckinButton.isEnabled = !useFaceId
+        cell.faceCheckinButton.backgroundColor = useFaceId
+            ? .lightGray
+            : UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
+        cell.disableFaceIdButton.isEnabled = useFaceId
+        cell.disableFaceIdButton.backgroundColor = useFaceId
+            ? UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
+            : .lightGray
         cell.documentId = reservation["documentId"] as? String
 
         return cell
@@ -179,11 +190,14 @@ class ReservationCell: UITableViewCell {
     let thumbnailImageView = UIImageView()
     let titleLabel = UILabel()
     let subtitleLabel = UILabel()
+    let faceIdStatusLabel = UILabel()
     let checkInLabel = UILabel()
     let checkOutLabel = UILabel()
     let checkInDateLabel = UILabel()
     let checkOutDateLabel = UILabel()
     let cancelButton = UIButton(type: .system)
+    let faceCheckinButton = UIButton(type: .system)
+    let disableFaceIdButton = UIButton(type: .system)
 
     var documentId: String?
 
@@ -200,6 +214,10 @@ class ReservationCell: UITableViewCell {
         subtitleLabel.textColor = .darkGray
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        faceIdStatusLabel.font = UIFont.systemFont(ofSize: 12)
+        faceIdStatusLabel.textColor = .gray
+        faceIdStatusLabel.translatesAutoresizingMaskIntoConstraints = false
 
         // 체크인/체크아웃 레이블
         checkInLabel.text = "체크인"
@@ -222,6 +240,26 @@ class ReservationCell: UITableViewCell {
         cancelButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
         cancelButton.addTarget(self, action: #selector(handleCancelTapped), for: .touchUpInside)
 
+        // 얼굴인식 체크인 버튼 설정
+        faceCheckinButton.setTitle("얼굴인식 체크인", for: .normal)
+        faceCheckinButton.setTitleColor(.white, for: .normal)
+        faceCheckinButton.backgroundColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
+        faceCheckinButton.layer.cornerRadius = 8
+        faceCheckinButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
+        faceCheckinButton.translatesAutoresizingMaskIntoConstraints = false
+        faceCheckinButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        faceCheckinButton.addTarget(self, action: #selector(handleFaceCheckinTapped), for: .touchUpInside)
+
+        // 얼굴인식 체크인 사용안함 버튼 설정
+        disableFaceIdButton.setTitle("얼굴인식 해제", for: .normal)
+        disableFaceIdButton.setTitleColor(.white, for: .normal)
+        disableFaceIdButton.backgroundColor = .darkGray
+        disableFaceIdButton.layer.cornerRadius = 8
+        disableFaceIdButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
+        disableFaceIdButton.translatesAutoresizingMaskIntoConstraints = false
+        disableFaceIdButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        disableFaceIdButton.addTarget(self, action: #selector(handleDisableFaceIdTapped), for: .touchUpInside)
+
         // 수평 스택
         let dateStack = UIStackView()
         let checkInStack = UIStackView(arrangedSubviews: [checkInLabel, checkInDateLabel])
@@ -234,11 +272,16 @@ class ReservationCell: UITableViewCell {
         dateStack.addArrangedSubview(checkInStack)
         dateStack.addArrangedSubview(checkOutStack)
 
-        let infoStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
+        let infoStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, faceIdStatusLabel])
         infoStack.axis = .vertical
         infoStack.spacing = 2
 
-        let contentStack = UIStackView(arrangedSubviews: [infoStack, dateStack, cancelButton])
+        let buttonStack = UIStackView(arrangedSubviews: [faceCheckinButton, disableFaceIdButton, cancelButton])
+        buttonStack.axis = .horizontal
+        buttonStack.spacing = 8
+        buttonStack.distribution = .fillEqually
+
+        let contentStack = UIStackView(arrangedSubviews: [infoStack, dateStack, buttonStack])
         contentStack.axis = .vertical
         contentStack.spacing = 12
         contentStack.translatesAutoresizingMaskIntoConstraints = false
@@ -277,6 +320,61 @@ class ReservationCell: UITableViewCell {
         viewController.present(alert, animated: true)
     }
 
+    @objc private func handleFaceCheckinTapped() {
+        guard let user = Auth.auth().currentUser,
+              let docId = documentId,
+              let viewController = self.findViewController() else { return }
+
+        let db = Firestore.firestore()
+        db.collection("users").document(user.uid).getDocument { snapshot, error in
+            let data = snapshot?.data()
+            let hasVector = data?["front_vector"] != nil || data?["left_vector"] != nil || data?["right_vector"] != nil
+
+            if !hasVector {
+                let alert = UIAlertController(title: "얼굴 정보 없음", message: "얼굴을 등록해주세요.", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "취소", style: .cancel, handler: nil))
+                alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
+                    let vc = FaceCaptureViewController()
+                    vc.documentId = docId
+                    viewController.navigationController?.pushViewController(vc, animated: true)
+                })
+                viewController.present(alert, animated: true)
+                NotificationCenter.default.addObserver(self, selector: #selector(self.updateUseFaceIdAfterCapture), name: NSNotification.Name("FaceIdRegisteredWithDocId"), object: nil)
+                return
+            } else {
+                let confirmAlert = UIAlertController(title: "얼굴인식 체크인", message: "얼굴인식을 사용해서 체크인 하시겠습니까?", preferredStyle: .alert)
+                confirmAlert.addAction(UIAlertAction(title: "취소", style: .cancel))
+                confirmAlert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
+                    db.collection("reserves").document(docId).updateData(["useFaceId": true]) { error in
+                        if let error = error {
+                            print("업데이트 실패: \(error)")
+                        } else {
+                            print("useFaceId가 true로 설정됨")
+                            NotificationCenter.default.post(name: NSNotification.Name("ReservationCancelled"), object: nil)
+                        }
+                    }
+                })
+                viewController.present(confirmAlert, animated: true)
+            }
+        }
+    }
+
+    @objc private func updateUseFaceIdAfterCapture(_ notification: Notification) {
+        guard let docId = notification.userInfo?["documentId"] as? String,
+              let myDocId = self.documentId,
+              docId == myDocId else { return }
+
+        Firestore.firestore().collection("reserves").document(docId).updateData(["useFaceId": true]) { error in
+            if let error = error {
+                print("useFaceId 업데이트 실패: \(error)")
+            } else {
+                print("useFaceId가 true로 설정됨")
+                NotificationCenter.default.post(name: NSNotification.Name("ReservationCancelled"), object: nil)
+            }
+        }
+        NotificationCenter.default.removeObserver(self, name: NSNotification.Name("FaceIdRegisteredWithDocId"), object: nil)
+    }
+
     private func cancelReservation() {
         guard let docId = documentId else { return }
         Firestore.firestore().collection("reserves").document(docId).delete { error in
@@ -299,4 +397,24 @@ class ReservationCell: UITableViewCell {
         }
         return nil
     }
+
+    @objc private func handleDisableFaceIdTapped() {
+        guard let docId = documentId,
+              let viewController = self.findViewController() else { return }
+
+        let confirmAlert = UIAlertController(title: "얼굴인식 체크인 해제", message: "얼굴인식 체크인을 해제 하시겠습니까?", preferredStyle: .alert)
+        confirmAlert.addAction(UIAlertAction(title: "취소", style: .cancel))
+        confirmAlert.addAction(UIAlertAction(title: "확인", style: .destructive) { _ in
+            Firestore.firestore().collection("reserves").document(docId).updateData(["useFaceId": false]) { error in
+                if let error = error {
+                    print("얼굴인식 사용안함 설정 실패: \(error)")
+                } else {
+                    print("useFaceId가 false로 설정됨")
+                    NotificationCenter.default.post(name: NSNotification.Name("ReservationCancelled"), object: nil)
+                }
+            }
+        })
+        viewController.present(confirmAlert, animated: true)
+    }
 }
+
