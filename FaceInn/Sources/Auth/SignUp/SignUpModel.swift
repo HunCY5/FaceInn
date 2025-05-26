@@ -60,6 +60,7 @@ final class SignUpModel {
             "email": email,
             "name": name,
             "loginStatus": false,
+            "type": "guest",
             "createdAt": Timestamp(date: Date())
         ]
         if let birthday = birthday {
