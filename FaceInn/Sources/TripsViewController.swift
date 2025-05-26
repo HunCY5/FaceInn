@@ -59,6 +59,11 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
         NotificationCenter.default.addObserver(self, selector: #selector(handleReservationCancelled), name: NSNotification.Name("ReservationCancelled"), object: nil)
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        fetchReservations()
+    }
+
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.dataSource = self
@@ -74,7 +79,15 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
     }
 
     private func fetchReservations() {
-        guard let user = Auth.auth().currentUser else { return }
+        guard let user = Auth.auth().currentUser else {
+            self.upcomingReservations = []
+            self.pastReservations = []
+            DispatchQueue.main.async {
+                self.tableView.reloadData()
+                self.updateEmptyLabelText()
+            }
+            return
+        }
         let db = Firestore.firestore()
         db.collection("reserves").whereField("userId", isEqualTo: user.uid).getDocuments { snapshot, error in
             guard let documents = snapshot?.documents, error == nil else {
