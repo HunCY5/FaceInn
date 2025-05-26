@@ -18,6 +18,10 @@ final class ReservationViewController: UIViewController {
     var startDate: Date?
     var endDate: Date?
     var guestCount: Int?
+
+    private let nameField = UITextField()
+    private let phoneField = UITextField()
+    private let payButton = UIButton(type: .system)
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -151,10 +155,8 @@ final class ReservationViewController: UIViewController {
         reservationInfoLabel.translatesAutoresizingMaskIntoConstraints = false
 
         // 6. Name and phone text fields
-        let nameField = UITextField()
         nameField.borderStyle = .roundedRect
         nameField.placeholder = "이름"
-        let phoneField = UITextField()
         phoneField.borderStyle = .roundedRect
         phoneField.placeholder = "휴대폰 번호"
         phoneField.keyboardType = .phonePad
@@ -162,11 +164,13 @@ final class ReservationViewController: UIViewController {
         if let user = Auth.auth().currentUser {
             let db = Firestore.firestore()
             let userRef = db.collection("users").document(user.uid)
-            userRef.getDocument { document, error in
+            userRef.getDocument { [weak self] document, error in
+                guard let self = self else { return }
                 if let document = document, document.exists {
                     let data = document.data()
-                    nameField.text = data?["name"] as? String
-                    phoneField.text = data?["phoneNumber"] as? String
+                    self.nameField.text = data?["name"] as? String
+                    self.phoneField.text = data?["phoneNumber"] as? String
+                    self.updatePayButtonState()
                 } else {
                     print("사용자 문서를 찾을 수 없습니다: \(error?.localizedDescription ?? "알 수 없는 오류")")
                 }
@@ -189,7 +193,6 @@ final class ReservationViewController: UIViewController {
         totalPriceLabel.translatesAutoresizingMaskIntoConstraints = false
 
         // 9. Payment button
-        let payButton = UIButton(type: .system)
         payButton.setTitle("\(totalPrice.formattedWithSeparator)원 결제하기", for: .normal)
         payButton.backgroundColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1.0)
         payButton.setTitleColor(.white, for: .normal)
@@ -198,6 +201,11 @@ final class ReservationViewController: UIViewController {
         payButton.translatesAutoresizingMaskIntoConstraints = false
         payButton.heightAnchor.constraint(equalToConstant: 44).isActive = true
         payButton.addTarget(self, action: #selector(saveReservationToFirestore), for: .touchUpInside)
+        // Add text field target actions for validation
+        nameField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
+        phoneField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
+        updatePayButtonState()
+
 
 
         // Stack for total payment title and price
@@ -332,6 +340,17 @@ final class ReservationViewController: UIViewController {
             }
         }
     }
+
+    @objc private func textFieldDidChange(_ textField: UITextField) {
+        updatePayButtonState()
+    }
+
+    private func updatePayButtonState() {
+        let isNameFilled = !(nameField.text?.isEmpty ?? true)
+        let isPhoneFilled = !(phoneField.text?.isEmpty ?? true)
+        payButton.isEnabled = isNameFilled && isPhoneFilled
+        payButton.alpha = payButton.isEnabled ? 1.0 : 0.5
+    }
 }
 
 private extension Int {
@@ -341,3 +360,4 @@ private extension Int {
         return formatter.string(from: NSNumber(value: self)) ?? "\(self)"
     }
 }
+
