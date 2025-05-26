@@ -313,7 +313,9 @@ final class ReservationViewController: UIViewController {
             "startDate": Timestamp(date: startDate),
             "endDate": Timestamp(date: endDate),
             "totalPrice": totalPrice,
-            "createdAt": FieldValue.serverTimestamp()
+            "createdAt": FieldValue.serverTimestamp(),
+            "accommodationName": accommodation.name,
+            "imageURL": room.imageURLs.first ?? ""
         ]
 
         Firestore.firestore().collection("reserves").addDocument(data: reservationData) { error in
