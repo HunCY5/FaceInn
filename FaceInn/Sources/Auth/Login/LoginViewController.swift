@@ -31,20 +31,37 @@ final class LoginViewController: UIViewController {
     }
 
     @objc private func didTapLogin() {
-        guard let email = loginView.emailField.text,
-              let password = loginView.passwordField.text,
-              !email.isEmpty, !password.isEmpty else {
-            showAlert(title: "오류", message: "이메일과 비밀번호를 입력해주세요.")
+        guard let email = loginView.emailField.text else {
+            showAlert(title: "로그인 실패", message: "이메일을 입력해주세요.")
+            return
+        }
+
+        if email.isEmpty {
+            showAlert(title: "로그인 실패", message: "이메일을 입력해주세요.")
+            return
+        }
+
+        guard let password = loginView.passwordField.text else {
+            showAlert(title: "로그인 실패", message: "비밀번호를 입력해주세요.")
+            return
+        }
+
+        if password.isEmpty {
+            showAlert(title: "로그인 실패", message: "비밀번호를 입력해주세요.")
             return
         }
 
         loginModel.login(email: email, password: password) { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
-                case .success:
-                    self?.onLoginSuccess?()
-                    NotificationCenter.default.post(name: .userDidLogin, object: nil)
-                    self?.navigationController?.popViewController(animated: true)
+                case .success(let userType):
+                    if userType == "host" {
+                        self?.showAlert(title: "알림", message: "호스트 로그인은 '호스트 로그인' 버튼을 통해 진행해주세요.")
+                    } else {
+                        self?.onLoginSuccess?()
+                        NotificationCenter.default.post(name: .userDidLogin, object: nil)
+                        self?.navigationController?.popViewController(animated: true)
+                    }
                 case .failure(let error):
                     self?.showAlert(title: "로그인 실패", message: error.localizedDescription)
                 }
@@ -62,10 +79,6 @@ final class LoginViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "확인", style: .default))
         present(alert, animated: true)
     }
-}
-
-#Preview {
-    LoginViewController()
 }
 
 extension Notification.Name {
