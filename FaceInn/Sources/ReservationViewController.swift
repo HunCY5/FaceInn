@@ -413,9 +413,8 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
             }))
             alert.addAction(UIAlertAction(title: "확인", style: .default, handler: { _ in
                 let faceCaptureVC = FaceCaptureViewController()
-                faceCaptureVC.modalPresentationStyle = .fullScreen
                 faceCaptureVC.delegate = self
-                self.present(faceCaptureVC, animated: true)
+                self.navigationController?.pushViewController(faceCaptureVC, animated: true)
             }))
             present(alert, animated: true)
         }
