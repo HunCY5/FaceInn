@@ -173,6 +173,16 @@ final class RoomCardView: UIView {
             reserveButton.backgroundColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
         }
     }
+
+    func setReserveButtonEnabled(_ isEnabled: Bool) {
+        reserveButton.isEnabled = isEnabled
+        reserveButton.alpha = isEnabled ? 1.0 : 0.5
+        reserveButton.backgroundColor = isEnabled ? UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1) : .lightGray
+    }
+
+    func setReserveButtonTitle(_ title: String) {
+        reserveButton.setTitle(title, for: .normal)
+    }
     @objc private func didTapReserveButton() {
         guard let room = currentRoom else { return }
 

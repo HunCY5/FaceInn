@@ -423,6 +423,32 @@ final class AccommodationDetailViewController: UIViewController, UICollectionVie
             roomCard.alpha = 0
             roomCard.transform = CGAffineTransform(translationX: 0, y: 20)
 
+            // Firestore 예약 중복 확인 및 예약 버튼 비활성화 처리
+            if let accommodation = self.accommodation {
+                let db = Firestore.firestore()
+                db.collection("reserves")
+                    .whereField("accommodationId", isEqualTo: accommodation.id)
+                    .whereField("roomId", isEqualTo: room.id)
+                    .getDocuments { snapshot, error in
+                        guard let documents = snapshot?.documents else { return }
+                        let hasOverlap = documents.contains { doc in
+                            guard
+                                let reservedStart = (doc["startDate"] as? Timestamp)?.dateValue(),
+                                let reservedEnd = (doc["endDate"] as? Timestamp)?.dateValue()
+                            else {
+                                return false
+                            }
+                            // 날짜 겹침 여부 검사
+                            return !(endDate <= reservedStart || startDate >= reservedEnd)
+                        }
+
+                        if hasOverlap {
+                            roomCard.setReserveButtonEnabled(false)
+                            roomCard.setReserveButtonTitle("다른 날짜 선택")
+                        }
+                    }
+            }
+
             roomCard.onReserveButtonTapped = { [weak self] room in
                 guard let self = self, let accommodation = self.accommodation else { return }
 
