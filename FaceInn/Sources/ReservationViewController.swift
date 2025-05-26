@@ -419,6 +419,28 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
             present(alert, animated: true)
         }
     }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+
+        if let user = Auth.auth().currentUser {
+            let db = Firestore.firestore()
+            let userRef = db.collection("users").document(user.uid)
+            userRef.getDocument { [weak self] document, error in
+                guard let self = self else { return }
+                if let document = document, document.exists {
+                    let data = document.data()
+                    let front = data?["front_vector"]
+                    let left = data?["left_vector"]
+                    let right = data?["right_vector"]
+                    self.faceIdAvailable = front != nil || left != nil || right != nil
+                    if !self.faceIdAvailable {
+                        self.faceIdSwitch.setOn(false, animated: false)
+                    }
+                }
+            }
+        }
+    }
 }
 
 // 얼굴 등록 완료 델리게이트 구현
