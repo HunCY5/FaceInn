@@ -26,6 +26,7 @@ final class ProfileViewController: UIViewController {
         profileView.faceIDLoginButton.addTarget(self, action: #selector(didTapLogin), for: .touchUpInside)
         profileView.logoutButton.addTarget(self, action: #selector(didTapLogout), for: .touchUpInside)
         profileView.faceIDRegisterButton.addTarget(self, action: #selector(didTapFaceIDAction), for: .touchUpInside)
+        profileView.hostLoginButton.addTarget(self, action: #selector(didTapHostLogin), for: .touchUpInside)
         updateView()
     }
 
@@ -141,5 +142,13 @@ final class ProfileViewController: UIViewController {
             }
         }))
         present(alert, animated: true)
+    }
+}
+
+// MARK: - 호스트 로그인
+extension ProfileViewController {
+    @objc private func didTapHostLogin() {
+        let hostLoginVC = HostLoginViewController()
+        navigationController?.pushViewController(hostLoginVC, animated: true)
     }
 }

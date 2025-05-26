@@ -1,13 +1,13 @@
 //
-//  LoginView.swift
+//  HostLoginView.swift
 //  FaceInn
 //
-//  Created by CHOI on 5/20/25.
+//  Created by CHOI on 5/24/25.
 //
 
 import UIKit
 
-final class LoginView: UIView {
+final class HostLoginView: UIView {
 
     // MARK: - UI Elements
 
@@ -19,7 +19,7 @@ final class LoginView: UIView {
 
     let welcomeLabel: UILabel = {
         let label = UILabel()
-        label.text = "Welcome to FaceInn"
+        label.text = "숙소 호스트 로그인"
         label.font = .systemFont(ofSize: 16)
         label.textAlignment = .center
         return label
@@ -69,33 +69,7 @@ final class LoginView: UIView {
         return btn
     }()
 
-    let orLabel: UILabel = {
-        let label = UILabel()
-        label.text = "or"
-        label.textAlignment = .center
-        return label
-    }()
-
-    let leftLine = UIView()
-    let rightLine = UIView()
-
-    let appleLoginButton = makeCircleButton(systemName: "apple.logo")
-    let googleLoginButton = makeCircleButton(systemName: "globe")
-    let kakaoLoginButton = makeCircleButton(systemName: "message")
-
-    static func makeCircleButton(systemName: String) -> UIButton {
-        let btn = UIButton(type: .system)
-        let image = UIImage(systemName: systemName)
-        btn.setImage(image, for: .normal)
-        btn.tintColor = .systemGreen
-        btn.backgroundColor = UIColor.lightGray.withAlphaComponent(0.3)
-        btn.layer.cornerRadius = 25
-        btn.layer.borderWidth = 1
-        btn.layer.borderColor = UIColor.systemGreen.cgColor
-        btn.translatesAutoresizingMaskIntoConstraints = false
-        return btn
-    }
-
+    // MARK: - Initializer
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -112,18 +86,10 @@ final class LoginView: UIView {
     private func setupLayout() {
         [logoImageView, welcomeLabel,
          emailField, passwordField, findIdPwButton,
-         signupButton, orLabel, leftLine, rightLine,
-         appleLoginButton, googleLoginButton, kakaoLoginButton
-        ].forEach {
+         loginButton, signupButton].forEach {
             addSubview($0)
             $0.translatesAutoresizingMaskIntoConstraints = false
         }
-        
-        addSubview(loginButton)
-        loginButton.translatesAutoresizingMaskIntoConstraints = false
-
-        leftLine.backgroundColor = .lightGray
-        rightLine.backgroundColor = .lightGray
 
         NSLayoutConstraint.activate([
             logoImageView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 40),
@@ -146,7 +112,7 @@ final class LoginView: UIView {
 
             findIdPwButton.topAnchor.constraint(equalTo: passwordField.bottomAnchor, constant: 6),
             findIdPwButton.trailingAnchor.constraint(equalTo: passwordField.trailingAnchor),
-            
+
             loginButton.topAnchor.constraint(equalTo: findIdPwButton.bottomAnchor, constant: 20),
             loginButton.leadingAnchor.constraint(equalTo: emailField.leadingAnchor),
             loginButton.trailingAnchor.constraint(equalTo: emailField.trailingAnchor),
@@ -154,34 +120,7 @@ final class LoginView: UIView {
 
             signupButton.topAnchor.constraint(equalTo: loginButton.bottomAnchor, constant: 16),
             signupButton.centerXAnchor.constraint(equalTo: centerXAnchor),
-
-            leftLine.topAnchor.constraint(equalTo: signupButton.bottomAnchor, constant: 40),
-            leftLine.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 40),
-            leftLine.trailingAnchor.constraint(equalTo: orLabel.leadingAnchor, constant: -8),
-            leftLine.heightAnchor.constraint(equalToConstant: 1),
-
-            orLabel.centerYAnchor.constraint(equalTo: leftLine.centerYAnchor),
-            orLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-
-            rightLine.topAnchor.constraint(equalTo: leftLine.topAnchor),
-            rightLine.leadingAnchor.constraint(equalTo: orLabel.trailingAnchor, constant: 8),
-            rightLine.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -40),
-            rightLine.heightAnchor.constraint(equalTo: leftLine.heightAnchor),
-
-            appleLoginButton.topAnchor.constraint(equalTo: leftLine.bottomAnchor, constant: 24),
-            appleLoginButton.centerXAnchor.constraint(equalTo: centerXAnchor, constant: -80),
-            appleLoginButton.widthAnchor.constraint(equalToConstant: 50),
-            appleLoginButton.heightAnchor.constraint(equalToConstant: 50),
-
-            googleLoginButton.centerYAnchor.constraint(equalTo: appleLoginButton.centerYAnchor),
-            googleLoginButton.centerXAnchor.constraint(equalTo: centerXAnchor),
-            googleLoginButton.widthAnchor.constraint(equalTo: appleLoginButton.widthAnchor),
-            googleLoginButton.heightAnchor.constraint(equalTo: appleLoginButton.heightAnchor),
-
-            kakaoLoginButton.centerYAnchor.constraint(equalTo: appleLoginButton.centerYAnchor),
-            kakaoLoginButton.centerXAnchor.constraint(equalTo: centerXAnchor, constant: 80),
-            kakaoLoginButton.widthAnchor.constraint(equalTo: appleLoginButton.widthAnchor),
-            kakaoLoginButton.heightAnchor.constraint(equalTo: appleLoginButton.heightAnchor)
         ])
     }
 }
+

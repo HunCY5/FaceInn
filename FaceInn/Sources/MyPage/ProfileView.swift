@@ -12,6 +12,7 @@ final class ProfileView: UIView {
     var loginButton: UIButton!
     var faceIDLoginButton: UIButton!
     var logoutButton: UIButton!
+    var hostLoginButton: UIButton!
     let nameLabel = UILabel()
     let emailLabel = UILabel()
     let phoneLabel = UILabel()
@@ -250,6 +251,16 @@ final class ProfileView: UIView {
         supportStack.addArrangedSubview(privacyRow)
 
         guestViewStack.addArrangedSubview(supportStack)
+
+        // 호스트 로그인 텍스트 버튼
+        let hostLoginButton = UIButton(type: .system)
+        hostLoginButton.setTitle("숙소 호스트이신가요? 로그인하기", for: .normal)
+        hostLoginButton.setTitleColor(.systemBlue, for: .normal)
+        hostLoginButton.titleLabel?.font = .systemFont(ofSize: 14)
+        hostLoginButton.contentHorizontalAlignment = .center
+        hostLoginButton.translatesAutoresizingMaskIntoConstraints = false
+        guestViewStack.addArrangedSubview(hostLoginButton)
+        self.hostLoginButton = hostLoginButton
     }
 
     // MARK: - User View: 구성요소 및 로그인 후 화면 UI 설정
