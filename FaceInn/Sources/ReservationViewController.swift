@@ -197,6 +197,7 @@ final class ReservationViewController: UIViewController {
         payButton.layer.cornerRadius = 8
         payButton.translatesAutoresizingMaskIntoConstraints = false
         payButton.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        payButton.addTarget(self, action: #selector(saveReservationToFirestore), for: .touchUpInside)
 
 
         // Stack for total payment title and price
@@ -277,6 +278,59 @@ final class ReservationViewController: UIViewController {
             mainStack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -24),
             mainStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 24),
         ])
+    }
+    
+    @objc private func saveReservationToFirestore() {
+        guard let user = Auth.auth().currentUser,
+              let accommodation = accommodation,
+              let room = room,
+              let startDate = startDate,
+              let endDate = endDate else {
+            print("예약 정보가 불완전합니다.")
+            return
+        }
+
+        let guestCount = UserDefaults.standard.integer(forKey: "selectedGuestCount")
+        let calendar = Calendar.current
+        let numberOfNights = calendar.dateComponents([.day], from: startDate, to: endDate).day ?? 1
+        let totalPrice = room.price * numberOfNights
+
+        let reservationData: [String: Any] = [
+            "userId": user.uid,
+            "hostId": accommodation.hostId ?? "",
+            "accommodationId": accommodation.id,
+            "roomId": room.id,
+            "roomName": room.name,
+            "guestCount": guestCount,
+            "startDate": Timestamp(date: startDate),
+            "endDate": Timestamp(date: endDate),
+            "totalPrice": totalPrice,
+            "createdAt": FieldValue.serverTimestamp()
+        ]
+
+        Firestore.firestore().collection("reserves").addDocument(data: reservationData) { error in
+            if let error = error {
+                print("예약 저장 실패: \(error.localizedDescription)")
+            } else {
+                print("예약 저장 성공")
+                // 예약 완료 알림 표시 및 탭바로 이동
+                DispatchQueue.main.async {
+                    let alert = UIAlertController(title: "예약 완료", message: "예약이 성공적으로 완료되었습니다.", preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
+                        // 탭바 컨트롤러로 이동
+                        let tabBarController = MainTabBarController()
+                        tabBarController.selectedIndex = 2
+                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                           let sceneDelegate = windowScene.delegate as? UIWindowSceneDelegate,
+                           let window = sceneDelegate.window {
+                            window?.rootViewController = tabBarController
+                            window?.makeKeyAndVisible()
+                        }
+                    })
+                    self.present(alert, animated: true)
+                }
+            }
+        }
     }
 }
 
