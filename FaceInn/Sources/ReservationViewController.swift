@@ -330,6 +330,9 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
     }
     
     @objc private func saveReservationToFirestore() {
+        // 결제 버튼 중복 방지: 비활성화
+        payButton.isEnabled = false
+
         guard let user = Auth.auth().currentUser,
               let accommodation = accommodation,
               let room = room,
@@ -363,6 +366,7 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
         Firestore.firestore().collection("reserves").addDocument(data: reservationData) { error in
             if let error = error {
                 print("예약 저장 실패: \(error.localizedDescription)")
+                self.payButton.isEnabled = true
             } else {
                 print("예약 저장 성공")
                 // 예약 완료 알림 표시 및 탭바로 이동
