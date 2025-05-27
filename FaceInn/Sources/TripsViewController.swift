@@ -256,7 +256,7 @@ class ReservationCell: UITableViewCell {
         cancelButton.setTitleColor(.white, for: .normal)
         cancelButton.backgroundColor = .systemRed
         cancelButton.layer.cornerRadius = 8
-        cancelButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
+        cancelButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 12)
         cancelButton.translatesAutoresizingMaskIntoConstraints = false
         cancelButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
         cancelButton.addTarget(self, action: #selector(handleCancelTapped), for: .touchUpInside)
@@ -266,7 +266,7 @@ class ReservationCell: UITableViewCell {
         faceCheckinButton.setTitleColor(.white, for: .normal)
         faceCheckinButton.backgroundColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
         faceCheckinButton.layer.cornerRadius = 8
-        faceCheckinButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
+        faceCheckinButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 12)
         faceCheckinButton.translatesAutoresizingMaskIntoConstraints = false
         faceCheckinButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
         faceCheckinButton.addTarget(self, action: #selector(handleFaceCheckinTapped), for: .touchUpInside)
@@ -276,7 +276,7 @@ class ReservationCell: UITableViewCell {
         disableFaceIdButton.setTitleColor(.white, for: .normal)
         disableFaceIdButton.backgroundColor = .darkGray
         disableFaceIdButton.layer.cornerRadius = 8
-        disableFaceIdButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
+        disableFaceIdButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 12)
         disableFaceIdButton.translatesAutoresizingMaskIntoConstraints = false
         disableFaceIdButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
         disableFaceIdButton.addTarget(self, action: #selector(handleDisableFaceIdTapped), for: .touchUpInside)

@@ -426,6 +426,7 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        self.tabBarController?.tabBar.isHidden = true
 
         if let user = Auth.auth().currentUser {
             let db = Firestore.firestore()
