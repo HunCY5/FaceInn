@@ -172,25 +172,11 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
         cell.faceIdStatusLabel.text = useFaceId ? "얼굴인식 체크인 사용" : "얼굴인식 체크인 사용 안함"
 
         cell.showCancelButton(selectedTab == 0)
-        cell.faceCheckinButton.isEnabled = !useFaceId
-        cell.faceCheckinButton.backgroundColor = useFaceId
-            ? .lightGray
-            : UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
-        cell.disableFaceIdButton.isEnabled = useFaceId
-        cell.disableFaceIdButton.backgroundColor = useFaceId
-            ? UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
-            : .lightGray
         cell.documentId = reservation["documentId"] as? String
-
-        // Hide buttons if selectedTab == 1 (이용후)
-        if selectedTab == 1 {
-            cell.faceCheckinButton.isHidden = true
-            cell.disableFaceIdButton.isHidden = true
-        } else {
-            cell.faceCheckinButton.isHidden = false
-            cell.disableFaceIdButton.isHidden = false
-        }
-
+        // 얼굴인식 토글 스위치 설정
+        cell.faceToggleSwitch.setOn(useFaceId, animated: false)
+        cell.faceToggleSwitch.isHidden = (selectedTab == 1)
+        cell.faceToggleLabel.isHidden = (selectedTab == 1)
         return cell
     }
 
@@ -217,8 +203,8 @@ class ReservationCell: UITableViewCell {
     let checkInDateLabel = UILabel()
     let checkOutDateLabel = UILabel()
     let cancelButton = UIButton(type: .system)
-    let faceCheckinButton = UIButton(type: .system)
-    let disableFaceIdButton = UIButton(type: .system)
+    let faceToggleSwitch = UISwitch()
+    let faceToggleLabel = UILabel()
 
     var documentId: String?
 
@@ -261,35 +247,15 @@ class ReservationCell: UITableViewCell {
         cancelButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
         cancelButton.addTarget(self, action: #selector(handleCancelTapped), for: .touchUpInside)
 
-        // 얼굴인식 체크인 버튼 설정
-        faceCheckinButton.setTitle("얼굴인식 체크인", for: .normal)
-        faceCheckinButton.setTitleColor(.white, for: .normal)
-        faceCheckinButton.backgroundColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
-        faceCheckinButton.layer.cornerRadius = 8
-        faceCheckinButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 12)
-        faceCheckinButton.translatesAutoresizingMaskIntoConstraints = false
-        faceCheckinButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
-        faceCheckinButton.addTarget(self, action: #selector(handleFaceCheckinTapped), for: .touchUpInside)
-
-        // 얼굴인식 체크인 사용안함 버튼 설정
-        disableFaceIdButton.setTitle("얼굴인식 해제", for: .normal)
-        disableFaceIdButton.setTitleColor(.white, for: .normal)
-        disableFaceIdButton.backgroundColor = .darkGray
-        disableFaceIdButton.layer.cornerRadius = 8
-        disableFaceIdButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 12)
-        disableFaceIdButton.translatesAutoresizingMaskIntoConstraints = false
-        disableFaceIdButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
-        disableFaceIdButton.addTarget(self, action: #selector(handleDisableFaceIdTapped), for: .touchUpInside)
-
-        // 버튼 터치 애니메이션 효과 추가 (각 버튼에 명시적으로 이벤트 추가)
-        faceCheckinButton.addTarget(self, action: #selector(buttonTouchDown(_:)), for: .touchDown)
-        faceCheckinButton.addTarget(self, action: #selector(buttonTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
-
-        disableFaceIdButton.addTarget(self, action: #selector(buttonTouchDown(_:)), for: .touchDown)
-        disableFaceIdButton.addTarget(self, action: #selector(buttonTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        faceToggleSwitch.translatesAutoresizingMaskIntoConstraints = false
+        faceToggleSwitch.addTarget(self, action: #selector(handleFaceSwitchChanged(_:)), for: .valueChanged)
 
         cancelButton.addTarget(self, action: #selector(buttonTouchDown(_:)), for: .touchDown)
         cancelButton.addTarget(self, action: #selector(buttonTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        
+        faceToggleLabel.text = "얼굴인식 체크인"
+        faceToggleLabel.font = UIFont.systemFont(ofSize: 12)
+        faceToggleLabel.textColor = .gray
 
         // 수평 스택
         let dateStack = UIStackView()
@@ -307,7 +273,12 @@ class ReservationCell: UITableViewCell {
         infoStack.axis = .vertical
         infoStack.spacing = 2
 
-        let buttonStack = UIStackView(arrangedSubviews: [faceCheckinButton, disableFaceIdButton, cancelButton])
+        let faceToggleStack = UIStackView(arrangedSubviews: [faceToggleLabel, faceToggleSwitch])
+        faceToggleStack.axis = .horizontal
+        faceToggleStack.spacing = 0
+        faceToggleStack.alignment = .center
+
+        let buttonStack = UIStackView(arrangedSubviews: [faceToggleStack, cancelButton])
         buttonStack.axis = .horizontal
         buttonStack.spacing = 8
         buttonStack.distribution = .fillEqually
@@ -351,41 +322,48 @@ class ReservationCell: UITableViewCell {
         viewController.present(alert, animated: true)
     }
 
-    @objc private func handleFaceCheckinTapped() {
+    @objc private func handleFaceSwitchChanged(_ sender: UISwitch) {
         guard let user = Auth.auth().currentUser,
               let docId = documentId,
               let viewController = self.findViewController() else { return }
 
         let db = Firestore.firestore()
-        db.collection("users").document(user.uid).getDocument { snapshot, error in
-            let data = snapshot?.data()
+
+        db.collection("users").document(user.uid).getDocument { userSnapshot, _ in
+            let data = userSnapshot?.data()
             let hasVector = data?["front_vector"] != nil || data?["left_vector"] != nil || data?["right_vector"] != nil
 
             if !hasVector {
+                sender.setOn(false, animated: true)
                 let alert = UIAlertController(title: "얼굴 정보 없음", message: "얼굴을 등록해주세요.", preferredStyle: .alert)
-                alert.addAction(UIAlertAction(title: "취소", style: .cancel, handler: nil))
+                alert.addAction(UIAlertAction(title: "취소", style: .cancel))
                 alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
                     let vc = FaceCaptureViewController()
                     vc.documentId = docId
                     viewController.navigationController?.pushViewController(vc, animated: true)
                 })
                 viewController.present(alert, animated: true)
-                NotificationCenter.default.addObserver(self, selector: #selector(self.updateUseFaceIdAfterCapture), name: NSNotification.Name("FaceIdRegisteredWithDocId"), object: nil)
                 return
-            } else {
-                let confirmAlert = UIAlertController(title: "얼굴인식 체크인", message: "얼굴인식을 사용해서 체크인 하시겠습니까?", preferredStyle: .alert)
-                confirmAlert.addAction(UIAlertAction(title: "취소", style: .cancel))
-                confirmAlert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
-                    db.collection("reserves").document(docId).updateData(["useFaceId": true]) { error in
-                        if let error = error {
-                            print("업데이트 실패: \(error)")
-                        } else {
-                            print("useFaceId가 true로 설정됨")
-                            NotificationCenter.default.post(name: NSNotification.Name("ReservationCancelled"), object: nil)
-                        }
-                    }
+            }
+
+            if sender.isOn {
+                let alert = UIAlertController(title: "얼굴인식 체크인", message: "얼굴인식을 사용해서 체크인 하시겠습니까?", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "취소", style: .cancel) { _ in
+                    sender.setOn(false, animated: true)
                 })
-                viewController.present(confirmAlert, animated: true)
+                alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
+                    db.collection("reserves").document(docId).updateData(["useFaceId": true])
+                })
+                viewController.present(alert, animated: true)
+            } else {
+                let alert = UIAlertController(title: "얼굴인식 체크인 해제", message: "얼굴인식 체크인을 사용하지 않으시겠습니까?", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "취소", style: .cancel) { _ in
+                    sender.setOn(true, animated: true)
+                })
+                alert.addAction(UIAlertAction(title: "확인", style: .destructive) { _ in
+                    db.collection("reserves").document(docId).updateData(["useFaceId": false])
+                })
+                viewController.present(alert, animated: true)
             }
         }
     }
@@ -429,24 +407,7 @@ class ReservationCell: UITableViewCell {
         return nil
     }
 
-    @objc private func handleDisableFaceIdTapped() {
-        guard let docId = documentId,
-              let viewController = self.findViewController() else { return }
-
-        let confirmAlert = UIAlertController(title: "얼굴인식 체크인 해제", message: "얼굴인식 체크인을 해제 하시겠습니까?", preferredStyle: .alert)
-        confirmAlert.addAction(UIAlertAction(title: "취소", style: .cancel))
-        confirmAlert.addAction(UIAlertAction(title: "확인", style: .destructive) { _ in
-            Firestore.firestore().collection("reserves").document(docId).updateData(["useFaceId": false]) { error in
-                if let error = error {
-                    print("얼굴인식 사용안함 설정 실패: \(error)")
-                } else {
-                    print("useFaceId가 false로 설정됨")
-                    NotificationCenter.default.post(name: NSNotification.Name("ReservationCancelled"), object: nil)
-                }
-            }
-        })
-        viewController.present(confirmAlert, animated: true)
-    }
+    // handleDisableFaceIdTapped 제거됨
 
     @objc private func buttonTouchDown(_ sender: UIButton) {
         UIView.animate(withDuration: 0.15,
