@@ -78,6 +78,20 @@ final class ProfileViewController: UIViewController {
                         } else {
                             print("얼굴 정보 삭제됨")
                             self.updateView()
+                            // 얼굴 정보 삭제 성공 시 reserves 컬렉션의 useFaceId 값을 false로 업데이트
+                            let reservesRef = db.collection("reserves")
+                            reservesRef.whereField("userId", isEqualTo: user.uid)
+                                .whereField("useFaceId", isEqualTo: true)
+                                .getDocuments { snapshot, error in
+                                    guard let documents = snapshot?.documents else { return }
+                                    let now = Date()
+                                    for doc in documents {
+                                        if let endDate = (doc.data()["endDate"] as? Timestamp)?.dateValue(),
+                                           endDate > now {
+                                            reservesRef.document(doc.documentID).updateData(["useFaceId": false])
+                                        }
+                                    }
+                                }
                         }
                     }
                 })

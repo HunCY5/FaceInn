@@ -14,7 +14,11 @@ import Vision
 import FirebaseFirestore
 import FirebaseAuth
 
+
 final class FaceCaptureViewController: UIViewController {
+    weak var delegate: FaceCaptureDelegate?
+    var shouldDismissToRoot: Bool = false
+    var documentId: String?
     // 카메라 세션 및 출력 처리, 얼굴 임베딩 추출을 위한 관련 변수들
     private var captureSession: AVCaptureSession!
     private var videoOutput: AVCaptureVideoDataOutput!
@@ -194,6 +198,17 @@ final class FaceCaptureViewController: UIViewController {
             db.collection("users").document(uid).setData(data, merge: true)
             let alert = UIAlertController(title: "완료", message: "모든 얼굴 촬영이 완료되었습니다.", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
+                if let docId = self.documentId {
+                    db.collection("reserves").document(docId).updateData(["useFaceId": true]) { error in
+                        if let error = error {
+                            print("예약 문서 useFaceId 업데이트 실패: \(error)")
+                        } else {
+                            print("예약 문서 useFaceId 업데이트 성공")
+                            NotificationCenter.default.post(name: NSNotification.Name("ReservationCancelled"), object: nil)
+                        }
+                    }
+                }
+                self.delegate?.faceCaptureDidFinish()
                 self.navigationController?.popViewController(animated: true)
             })
             self.present(alert, animated: true)
