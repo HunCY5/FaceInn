@@ -8,7 +8,6 @@
 
 import Foundation
 
-/// 호스트 회원가입에 필요한 데이터를 관리하는 모델 클래스
 final class HostSignUpModel {
 
     var email: String = ""
