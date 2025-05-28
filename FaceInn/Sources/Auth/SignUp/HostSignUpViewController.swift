@@ -27,6 +27,7 @@ final class HostSignUpViewController: UIViewController, UITextFieldDelegate {
                                                name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)),
                                                name: UIResponder.keyboardWillHideNotification, object: nil)
+        hostSignUpView.phoneTextField.delegate = self
         hostSignUpView.businessNumberTextField.delegate = self
     }
 
@@ -115,42 +116,86 @@ final class HostSignUpViewController: UIViewController, UITextFieldDelegate {
         guard num.count == 10 else {
             hostSignUpView.businessNumberStatusLabel.text = "사업자등록번호는 숫자 10자리여야 합니다."
             hostSignUpView.businessNumberStatusLabel.textColor = .systemRed
+            model.isBusinessNumberValid = false
+            updateNextButtonState()
             return
         }
-        checkBusinessNumberValidation(num) { valid, status in
-            DispatchQueue.main.async {
-                let v = self.hostSignUpView
-                if valid {
-                    self.model.isBusinessNumberValid = true
-                    v.businessNumberStatusLabel.text = status
-                    v.businessNumberStatusLabel.textColor = .systemGreen
-                    v.businessNumberTextField.isEnabled = false
-                    v.verifyBusinessNumberButton.isEnabled = false
-                    v.verifyBusinessNumberButton.setTitleColor(.systemGray, for: .disabled)
-                    v.verifyBusinessNumberButton.layer.borderColor = UIColor.systemGray.cgColor
-                } else {
+        let db = Firestore.firestore()
+        // 먼저 Firestore에 동일한 사업자등록번호가 있는지 확인
+        db.collection("users").whereField("businessNumber", isEqualTo: num).getDocuments { snap, err in
+            if let err = err {
+                DispatchQueue.main.async {
+                    self.hostSignUpView.businessNumberStatusLabel.text = "오류: \(err.localizedDescription)"
+                    self.hostSignUpView.businessNumberStatusLabel.textColor = .systemRed
                     self.model.isBusinessNumberValid = false
-                    v.businessNumberStatusLabel.text = status
-                    v.businessNumberStatusLabel.textColor = .systemRed
+                    self.updateNextButtonState()
                 }
-                self.updateNextButtonState()
+                return
+            }
+            if let docs = snap?.documents, !docs.isEmpty {
+                DispatchQueue.main.async {
+                    self.hostSignUpView.businessNumberStatusLabel.text = "이미 등록된 사업자등록번호입니다."
+                    self.hostSignUpView.businessNumberStatusLabel.textColor = .systemRed
+                    self.model.isBusinessNumberValid = false
+                    self.updateNextButtonState()
+                }
+            } else {
+                // 기존 API 검증 호출
+                self.checkBusinessNumberValidation(num) { valid, status in
+                    DispatchQueue.main.async {
+                        if valid {
+                            self.model.isBusinessNumberValid = true
+                            let v = self.hostSignUpView
+                            v.businessNumberStatusLabel.text = status
+                            v.businessNumberStatusLabel.textColor = .systemGreen
+                            v.businessNumberTextField.isEnabled = false
+                            v.verifyBusinessNumberButton.isEnabled = false
+                            v.verifyBusinessNumberButton.setTitleColor(.systemGray, for: .disabled)
+                            v.verifyBusinessNumberButton.layer.borderColor = UIColor.systemGray.cgColor
+                        } else {
+                            self.model.isBusinessNumberValid = false
+                            self.hostSignUpView.businessNumberStatusLabel.text = status
+                            self.hostSignUpView.businessNumberStatusLabel.textColor = .systemRed
+                        }
+                        self.updateNextButtonState()
+                    }
+                }
             }
         }
     }
 
     // 회원가입
     @objc private func didTapNext() {
-        let db = Firestore.firestore()
-        let data: [String:Any] = [
-            "email": model.email,
-            "name": model.name,
-            "phone": model.phone,
-            "businessNumber": model.businessNumber,
-            "type": "host"
-        ]
-        db.collection("users").addDocument(data: data) { err in
-            if let err = err { self.showAlert("저장 실패: \(err)"); return }
-            print("호스트 가입 완료")
+        // Firebase Auth 계정 생성
+        Auth.auth().createUser(withEmail: model.email, password: model.password) { [weak self] authResult, error in
+            guard let self = self else { return }
+            if let error = error {
+                return self.showAlert("회원가입 오류: \(error.localizedDescription)")
+            }
+            // Auth 성공 시 Firestore에 사용자 정보 저장
+            let uid = authResult?.user.uid ?? UUID().uuidString
+            let db = Firestore.firestore()
+            let data: [String: Any] = [
+                "email": self.model.email,
+                "name": self.model.name,
+                "phone": self.model.phone,
+                "businessNumber": self.model.businessNumber,
+                "type": "host",
+                "uid": uid
+            ]
+            db.collection("users").document(uid).setData(data) { err in
+                if let err = err {
+                    self.showAlert("저장 실패: \(err.localizedDescription)")
+                } else {
+                    DispatchQueue.main.async {
+                        let alert = UIAlertController(title: nil, message: "회원가입이 완료되었습니다.", preferredStyle: .alert)
+                        alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
+                            self.navigationController?.popViewController(animated: true)
+                        })
+                        self.present(alert, animated: true)
+                    }
+                }
+            }
         }
     }
 
@@ -190,7 +235,7 @@ final class HostSignUpViewController: UIViewController, UITextFieldDelegate {
     func textFieldDidBeginEditing(_ textField: UITextField) {
         if textField == hostSignUpView.businessNumberTextField {
             UIView.animate(withDuration: 0.3) {
-                self.view.frame.origin.y = -50
+                self.view.frame.origin.y = -100
             }
         }
     }
@@ -210,29 +255,63 @@ private extension HostSignUpViewController {
     func checkBusinessNumberValidation(_ number: String,
         completion: @escaping (Bool, String) -> Void
     ) {
-        let apiKey = "<YOUR_ENCODED_SERVICE_KEY>"
+        let apiKey = "fbK2g297uMEM8V6tRh8OrEcJYGYvS2aK%2FhLSkVSySexCD0yEVarZgDG7Li6ZbrOy1Wa%2B%2BIrb%2BdZHjwnpnSDHBA%3D%3D"
         let urlStr = "https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=\(apiKey)"
         guard let url = URL(string: urlStr) else {
             return completion(false, "URL 생성 실패")
         }
-        var req = URLRequest(url: url); req.httpMethod = "POST"
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body = ["b_no": [number]]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        URLSession.shared.dataTask(with: req) { data, _, err in
-            if let err = err { return completion(false, "네트워크 오류") }
+        URLSession.shared.dataTask(with: req) { data, _, error in
+            if let error = error {
+                return completion(false, "네트워크 오류: \(error.localizedDescription)")
+            }
             guard let d = data,
-                  let json = try? JSONSerialization.jsonObject(with: d) as? [String:Any],
-                  let arr = json["data"] as? [[String:Any]],
-                  let r = arr.first,
-                  let code = r["b_stt_cd"] as? String else {
+                  let obj = try? JSONSerialization.jsonObject(with: d) as? [String:Any],
+                  let arr = obj["data"] as? [[String:Any]],
+                  let first = arr.first,
+                  let codeValue = first["b_stt_cd"] else {
+                return completion(false, "파싱 실패")
+            }
+            let code: String
+            if let s = codeValue as? String {
+                code = s
+            } else if let i = codeValue as? Int {
+                code = String(i)
+            } else {
                 return completion(false, "파싱 실패")
             }
             if code == "01" {
-                completion(true, "유효한 사업자등록번호입니다.")
+                completion(true, "사용 가능한 사업자등록번호입니다.")
             } else {
                 completion(false, "현재 운영 중인 사업자등록번호를 입력해주세요.")
             }
         }.resume()
     }
 }
+
+extension HostSignUpViewController {
+    func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+        // 휴대폰 최대 11자리 숫자 제한
+        if textField == hostSignUpView.phoneTextField {
+            let currentText = textField.text ?? ""
+            guard let stringRange = Range(range, in: currentText) else { return false }
+            let updatedText = currentText.replacingCharacters(in: stringRange, with: string)
+            let digitsCount = updatedText.filter { $0.isNumber }.count
+            return digitsCount <= 11
+        }
+        // 사업자등록번호 최대 10자리 숫자 제한
+        else if textField == hostSignUpView.businessNumberTextField {
+            let currentText = textField.text ?? ""
+            guard let stringRange = Range(range, in: currentText) else { return false }
+            let updatedText = currentText.replacingCharacters(in: stringRange, with: string)
+            let digitsCount = updatedText.filter { $0.isNumber }.count
+            return digitsCount <= 10
+        }
+        return true
+    }
+}
+

@@ -102,7 +102,7 @@ final class HostSignUpView: UIView {
         emailFormatLabel.isHidden = true
         
         // 비밀번호
-        passwordTextField.placeholder = "8자 이상 입력해주세요"
+        passwordTextField.placeholder = "비밀번호를 입력해주세요"
         passwordTextField.isSecureTextEntry = true
         passwordTextField.borderStyle = .roundedRect
         passwordTextField.translatesAutoresizingMaskIntoConstraints = false
