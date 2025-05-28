@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import FirebaseAuth
 
 protocol LoginDelegate: AnyObject {
     func didLoginSuccessfully()
@@ -51,18 +52,15 @@ final class LoginViewController: UIViewController {
             return
         }
 
-        loginModel.login(email: email, password: password) { [weak self] result in
+        loginModel.login(email: email, password: password, expectedType: "guest") { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
-                case .success(let userType):
-                    if userType == "host" {
-                        self?.showAlert(title: "알림", message: "호스트 로그인은 '호스트 로그인' 버튼을 통해 진행해주세요.")
-                    } else {
-                        self?.onLoginSuccess?()
-                        NotificationCenter.default.post(name: .userDidLogin, object: nil)
-                        self?.navigationController?.popViewController(animated: true)
-                    }
+                case .success(_):
+                    self?.onLoginSuccess?()
+                    NotificationCenter.default.post(name: .userDidLogin, object: nil)
+                    self?.navigationController?.popViewController(animated: true)
                 case .failure(let error):
+                    try? Auth.auth().signOut()
                     self?.showAlert(title: "로그인 실패", message: error.localizedDescription)
                 }
             }

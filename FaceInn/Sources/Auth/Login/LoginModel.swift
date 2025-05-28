@@ -12,7 +12,7 @@ import FirebaseFirestore
 final class LoginModel {
     private let db = Firestore.firestore()
 
-    func login(email: String, password: String, completion: @escaping (Result<String, Error>) -> Void) {
+    func login(email: String, password: String, expectedType: String? = nil, completion: @escaping (Result<String, Error>) -> Void) {
         Auth.auth().signIn(withEmail: email, password: password) { result, error in
             if let error = error as NSError? {
                 let authError = AuthErrorCode.Code(rawValue: error.code)
@@ -51,6 +51,12 @@ final class LoginModel {
                         return
                     }
                     if let data = snapshot?.data(), let type = data["type"] as? String {
+                        if let expected = expectedType, type != expected {
+                            let message = expected == "host"
+                                ? "게스트 계정으로 로그인할 수 없습니다."
+                                : "호스트 계정으로 로그인할 수 없습니다."
+                            return completion(.failure(NSError(domain: "Login", code: -3, userInfo: [NSLocalizedDescriptionKey: message])))
+                        }
                         completion(.success(type))
                     } else {
                         completion(.failure(NSError(domain: "Login", code: -2, userInfo: [NSLocalizedDescriptionKey: "사용자 유형(type)을 찾을 수 없습니다."])))
