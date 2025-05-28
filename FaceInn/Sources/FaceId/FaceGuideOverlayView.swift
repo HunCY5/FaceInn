@@ -76,10 +76,10 @@ final class FaceGuideOverlayView: UIView {
             imageSize = CGSize(width: 300, height: 360)
         case .left:
             imageName = isDetected ? "guide_right_green" : "guide_right_red"
-            imageSize = CGSize(width: 260, height: 312)
+            imageSize = CGSize(width: 300, height: 360)
         case .right:
             imageName = isDetected ? "guide_left_green" : "guide_left_red"
-            imageSize = CGSize(width: 260, height: 312)
+            imageSize = CGSize(width: 300, height: 360)
         }
 
         guard let image = UIImage(named: imageName) else { return }

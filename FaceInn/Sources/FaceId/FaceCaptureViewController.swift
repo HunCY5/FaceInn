@@ -73,7 +73,7 @@ final class FaceCaptureViewController: UIViewController {
     // AVFoundation을 사용해 카메라 입력 및 출력 설정
     private func setupCamera() {
         captureSession = AVCaptureSession()
-        guard let device = AVCaptureDevice.default(for: .video),
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
               let input = try? AVCaptureDeviceInput(device: device) else { return }
 
         captureSession.beginConfiguration()
@@ -236,26 +236,56 @@ final class FaceCaptureViewController: UIViewController {
 }
 
 extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
-    // 카메라 실시간 출력에서 얼굴 인식 여부 판단하여 프레임 색상 변경
+    // 카메라 실시간 출력에서 얼굴 인식 여부 판단하여 프레임 색상 변경 (중앙 가이드 내에 얼굴이 있는지 확인)
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         let request = VNDetectFaceRectanglesRequest { [weak self] req, err in
-            guard let self = self,
-                  let observations = req.results as? [VNFaceObservation],
-                  observations.first != nil else {
+            guard let self = self else { return }
+
+            guard let observations = req.results as? [VNFaceObservation],
+                  let observation = observations.first else {
                 DispatchQueue.main.async {
-                    self?.guideOverlayView.strokeColor = .red
-                    self?.isFaceDetected = false
+                    self.guideOverlayView.strokeColor = .red
+                    self.isFaceDetected = false
                 }
                 return
             }
+
+            let faceRect = VNImageRectForNormalizedRect(
+                observation.boundingBox,
+                Int(self.view.bounds.width),
+                Int(self.view.bounds.height)
+            )
+
+            let guideRect = CGRect(
+                x: self.view.bounds.midX - 150,
+                y: self.view.bounds.midY - 180,
+                width: 300,
+                height: 360
+            )
+
+            let intersection = guideRect.intersection(faceRect)
+            let intersectionArea = intersection.width * intersection.height
+            let faceArea = faceRect.width * faceRect.height
+            let isWithinGuide = faceArea > 0 && (intersectionArea / faceArea > 0.7)
+
+            let minFaceWidth: CGFloat = 85
+            let minFaceHeight: CGFloat = 100
+            let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
+
+            let isValidFace = isWithinGuide && isFaceLargeEnough
+
             DispatchQueue.main.async {
-                self.guideOverlayView.strokeColor = .green
-                self.isFaceDetected = true
-                self.currentSampleBuffer = sampleBuffer
+                self.guideOverlayView.strokeColor = isValidFace ? .green : .red
+                self.isFaceDetected = isValidFace
+                if isValidFace {
+                    self.currentSampleBuffer = sampleBuffer
+                }
             }
         }
+
         try? handler.perform([request])
     }
 }
