@@ -31,6 +31,7 @@ final class HostLoginViewController: UIViewController {
 
     @objc private func didTapSignup() {
         let signUpVC = HostSignUpViewController()
+        signUpVC.hidesBottomBarWhenPushed = true
         navigationController?.pushViewController(signUpVC, animated: true)
     }
 }
