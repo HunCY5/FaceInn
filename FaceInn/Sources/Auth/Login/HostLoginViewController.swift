@@ -6,10 +6,13 @@
 //
 
 import UIKit
+import FirebaseAuth
+import FirebaseFirestore
 
 final class HostLoginViewController: UIViewController {
 
     private let hostLoginView = HostLoginView()
+    private let loginModel = LoginModel()
 
     override func loadView() {
         self.view = hostLoginView
@@ -25,8 +28,31 @@ final class HostLoginViewController: UIViewController {
     }
 
     @objc private func didTapLogin() {
-        // TODO: 로그인 처리 로직 구현
-        print("호스트 로그인 버튼 눌림")
+        guard let email = hostLoginView.emailField.text,
+              let password = hostLoginView.passwordField.text else { return }
+        
+        loginModel.login(email: email, password: password, expectedType: "host") { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(_):
+                    // UserDefaults에 호스트 타입 저장
+                    UserDefaults.standard.set("host", forKey: "userType")
+                    
+                    // 루트뷰를 HostMainTabBarController로 교체
+                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                       let sceneDelegate = windowScene.delegate as? SceneDelegate,
+                       let window = sceneDelegate.window {
+                        window.rootViewController = HostMainTabBarController()
+                        window.makeKeyAndVisible()
+                    }
+
+
+                case .failure(let error):
+                    try? Auth.auth().signOut()
+                    self?.showAlert(title: "로그인 실패", message: error.localizedDescription)
+                }
+            }
+        }
     }
 
     @objc private func didTapSignup() {
@@ -34,4 +60,14 @@ final class HostLoginViewController: UIViewController {
         signUpVC.hidesBottomBarWhenPushed = true
         navigationController?.pushViewController(signUpVC, animated: true)
     }
+
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        present(alert, animated: true)
+    }
+}
+
+extension Notification.Name {
+    static let hostDidLogin = Notification.Name("hostDidLogin")
 }
