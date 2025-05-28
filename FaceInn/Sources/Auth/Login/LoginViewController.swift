@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import FirebaseAuth
 
 protocol LoginDelegate: AnyObject {
     func didLoginSuccessfully()
@@ -31,21 +32,35 @@ final class LoginViewController: UIViewController {
     }
 
     @objc private func didTapLogin() {
-        guard let email = loginView.emailField.text,
-              let password = loginView.passwordField.text,
-              !email.isEmpty, !password.isEmpty else {
-            showAlert(title: "오류", message: "이메일과 비밀번호를 입력해주세요.")
+        guard let email = loginView.emailField.text else {
+            showAlert(title: "로그인 실패", message: "이메일을 입력해주세요.")
             return
         }
 
-        loginModel.login(email: email, password: password) { [weak self] result in
+        if email.isEmpty {
+            showAlert(title: "로그인 실패", message: "이메일을 입력해주세요.")
+            return
+        }
+
+        guard let password = loginView.passwordField.text else {
+            showAlert(title: "로그인 실패", message: "비밀번호를 입력해주세요.")
+            return
+        }
+
+        if password.isEmpty {
+            showAlert(title: "로그인 실패", message: "비밀번호를 입력해주세요.")
+            return
+        }
+
+        loginModel.login(email: email, password: password, expectedType: "guest") { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
-                case .success:
+                case .success(_):
                     self?.onLoginSuccess?()
                     NotificationCenter.default.post(name: .userDidLogin, object: nil)
                     self?.navigationController?.popViewController(animated: true)
                 case .failure(let error):
+                    try? Auth.auth().signOut()
                     self?.showAlert(title: "로그인 실패", message: error.localizedDescription)
                 }
             }
@@ -62,10 +77,6 @@ final class LoginViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "확인", style: .default))
         present(alert, animated: true)
     }
-}
-
-#Preview {
-    LoginViewController()
 }
 
 extension Notification.Name {

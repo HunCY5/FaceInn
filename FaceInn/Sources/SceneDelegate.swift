@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import FirebaseAuth
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
@@ -18,7 +19,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         let window = UIWindow(windowScene: windowScene)
-        let rootVC = MainTabBarController()
+        // type: guest or host 구분하여 루트뷰 설정
+        let userType = UserDefaults.standard.string(forKey: "userType") ?? "guest"
+        let rootVC: UIViewController
+        if userType == "host" {
+            rootVC = HostMainTabBarController()
+        } else {
+            rootVC = MainTabBarController()
+        }
         window.rootViewController = rootVC
         window.makeKeyAndVisible()
         self.window = window
