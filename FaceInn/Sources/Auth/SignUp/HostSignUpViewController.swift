@@ -11,6 +11,8 @@ import FirebaseFirestore
 
 final class HostSignUpViewController: UIViewController, UITextFieldDelegate {
 
+    private let keyboardScrollMargin: CGFloat = 20
+
     private let hostSignUpView = HostSignUpView()
     private let model = HostSignUpModel()
 
@@ -225,10 +227,28 @@ final class HostSignUpViewController: UIViewController, UITextFieldDelegate {
 
     // MARK: - 키보드 처리
 
-    @objc private func keyboardWillShow(_ n: Notification) {
-        guard let f = n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
-        hostSignUpView.scrollView.contentInset.bottom = f.height + 20
-        hostSignUpView.scrollView.scrollIndicatorInsets.bottom = f.height + 20
+    @objc private func keyboardWillShow(_ notification: Notification) {
+        guard let kbFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+        
+        // 1) 키보드 높이만큼 스크롤뷰 인셋 조정
+        let inset = kbFrame.height - view.safeAreaInsets.bottom
+        hostSignUpView.scrollView.contentInset.bottom = inset
+        hostSignUpView.scrollView.verticalScrollIndicatorInsets.bottom = inset
+
+        // 2) 사업자등록번호 필드가 키보드에 가려지지 않도록 오프셋 계산
+        let fieldFrame = hostSignUpView.businessNumberTextField.convert(
+            hostSignUpView.businessNumberTextField.bounds,
+            to: hostSignUpView.scrollView
+        )
+        // 가시 영역(스크롤뷰 높이에서 인셋을 뺀 값)
+        let visibleHeight = hostSignUpView.scrollView.bounds.height - inset
+        // 필드 하단이 키보드 바로 위로 오도록 오프셋 계산
+        let offsetY = fieldFrame.maxY - visibleHeight + keyboardScrollMargin
+
+        // 3) 필요하면 스크롤
+        if offsetY > 0 {
+            hostSignUpView.scrollView.setContentOffset(.init(x: 0, y: offsetY), animated: true)
+        }
     }
 
     @objc private func keyboardWillHide(_ n: Notification) {
@@ -236,25 +256,6 @@ final class HostSignUpViewController: UIViewController, UITextFieldDelegate {
         hostSignUpView.scrollView.scrollIndicatorInsets = .zero
     }
 
-    // MARK: - UITextFieldDelegate
-
-    // 키보드 활성화 시, 필드 이동
-    func textFieldDidBeginEditing(_ textField: UITextField) {
-        if textField == hostSignUpView.businessNumberTextField {
-            UIView.animate(withDuration: 0.3) {
-                self.view.frame.origin.y = -100
-            }
-        }
-    }
-
-    // 키보드 비활성화 시, 필드 복귀
-    func textFieldDidEndEditing(_ textField: UITextField) {
-        if textField == hostSignUpView.businessNumberTextField {
-            UIView.animate(withDuration: 0.3) {
-                self.view.frame.origin.y = 0
-            }
-        }
-    }
 }
 
 // 사업자등록번호 API 호출
