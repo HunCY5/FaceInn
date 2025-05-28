@@ -255,7 +255,7 @@ final class ProfileView: UIView {
         // 호스트 로그인 텍스트 버튼
         let hostLoginButton = UIButton(type: .system)
         hostLoginButton.setTitle("숙소 호스트이신가요? 로그인하기", for: .normal)
-        hostLoginButton.setTitleColor(.systemBlue, for: .normal)
+        hostLoginButton.setTitleColor(UIColor(hex: "#2faf53"), for: .normal)
         hostLoginButton.titleLabel?.font = .systemFont(ofSize: 14)
         hostLoginButton.contentHorizontalAlignment = .center
         hostLoginButton.translatesAutoresizingMaskIntoConstraints = false
@@ -516,3 +516,19 @@ final class ProfileView: UIView {
 }
 
 
+
+extension UIColor {
+    convenience init(hex: String) {
+        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
+
+        var rgb: UInt64 = 0
+        Scanner(string: hexSanitized).scanHexInt64(&rgb)
+
+        let r = CGFloat((rgb & 0xFF0000) >> 16) / 255.0
+        let g = CGFloat((rgb & 0x00FF00) >> 8) / 255.0
+        let b = CGFloat(rgb & 0x0000FF) / 255.0
+
+        self.init(red: r, green: g, blue: b, alpha: 1.0)
+    }
+}

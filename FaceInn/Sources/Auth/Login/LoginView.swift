@@ -101,6 +101,8 @@ final class LoginView: UIView {
         super.init(frame: frame)
         backgroundColor = .white
         setupLayout()
+        addDoneButtonToKeyboard(for: emailField)
+        addDoneButtonToKeyboard(for: passwordField)
     }
 
     required init?(coder: NSCoder) {
@@ -183,5 +185,13 @@ final class LoginView: UIView {
             kakaoLoginButton.widthAnchor.constraint(equalTo: appleLoginButton.widthAnchor),
             kakaoLoginButton.heightAnchor.constraint(equalTo: appleLoginButton.heightAnchor)
         ])
+    }
+
+    private func addDoneButtonToKeyboard(for textField: UITextField) {
+        let toolbar = UIToolbar(); toolbar.sizeToFit()
+        let flex = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+        let done = UIBarButtonItem(title: "완료", style: .done, target: textField, action: #selector(resignFirstResponder))
+        toolbar.items = [flex, done]
+        textField.inputAccessoryView = toolbar
     }
 }
