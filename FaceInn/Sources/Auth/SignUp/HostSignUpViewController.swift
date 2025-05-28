@@ -190,6 +190,13 @@ final class HostSignUpViewController: UIViewController, UITextFieldDelegate {
                     DispatchQueue.main.async {
                         let alert = UIAlertController(title: nil, message: "회원가입이 완료되었습니다.", preferredStyle: .alert)
                         alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
+                            // 회원가입 직후 로그아웃 처리
+                            do {
+                                try Auth.auth().signOut()
+                            } catch {
+                                print("Sign-out after sign-up failed: \(error)")
+                            }
+                            UserDefaults.standard.set("guest", forKey: "userType")
                             self.navigationController?.popViewController(animated: true)
                         })
                         self.present(alert, animated: true)
