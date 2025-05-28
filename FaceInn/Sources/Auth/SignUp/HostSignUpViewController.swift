@@ -15,6 +15,7 @@ final class HostSignUpViewController: UIViewController, UITextFieldDelegate {
 
     private let hostSignUpView = HostSignUpView()
     private let model = HostSignUpModel()
+    private var activeTextField: UITextField?
 
     override func loadView() {
         view = hostSignUpView
@@ -228,6 +229,7 @@ final class HostSignUpViewController: UIViewController, UITextFieldDelegate {
     // MARK: - 키보드 처리
 
     @objc private func keyboardWillShow(_ notification: Notification) {
+        guard activeTextField == hostSignUpView.businessNumberTextField else { return }
         guard let kbFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
         
         // 1) 키보드 높이만큼 스크롤뷰 인셋 조정
@@ -254,6 +256,16 @@ final class HostSignUpViewController: UIViewController, UITextFieldDelegate {
     @objc private func keyboardWillHide(_ n: Notification) {
         hostSignUpView.scrollView.contentInset = .zero
         hostSignUpView.scrollView.scrollIndicatorInsets = .zero
+    }
+
+    func textFieldDidBeginEditing(_ textField: UITextField) {
+        activeTextField = textField
+    }
+
+    func textFieldDidEndEditing(_ textField: UITextField) {
+        if activeTextField == textField {
+            activeTextField = nil
+        }
     }
 
 }
@@ -322,4 +334,3 @@ extension HostSignUpViewController {
         return true
     }
 }
-
