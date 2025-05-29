@@ -151,7 +151,7 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
         cell.titleLabel.text = reservation["accommodationName"] as? String ?? "숙소명 없음"
         let startDate = (reservation["startDate"] as? Timestamp)?.dateValue()
         let endDate = (reservation["endDate"] as? Timestamp)?.dateValue()
-        let nights = startDate != nil && endDate != nil ? Calendar.current.dateComponents([.day], from: startDate!, to: endDate!).day ?? 1 : 1
+        let nights = reservation["numberOfNights"] as? Int ?? 1
         cell.subtitleLabel.text = "\(reservation["roomName"] as? String ?? "객실명 없음") • \(nights)박"
 
         let formatter = DateFormatter()

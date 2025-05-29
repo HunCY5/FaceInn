@@ -360,6 +360,7 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
             "startDate": Timestamp(date: startDate),
             "endDate": Timestamp(date: endDate),
             "totalPrice": totalPrice,
+            "numberOfNights": numberOfNights,
             "createdAt": FieldValue.serverTimestamp(),
             "accommodationName": accommodation.name,
             "imageURL": room.imageURLs.first ?? "",
