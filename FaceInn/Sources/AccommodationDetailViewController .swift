@@ -515,6 +515,8 @@ extension AccommodationDetailViewController: UIPopoverPresentationControllerDele
     }
     @objc private func sellerInfoTapped() {
         let vc = HostProfileViewController()
+        vc.accommodationName = self.accommodation?.name ?? ""
+        vc.accommodationAddress = self.accommodation?.location ?? ""
         vc.hostId = self.accommodation?.hostId ?? ""
         navigationController?.pushViewController(vc, animated: true)
     }
