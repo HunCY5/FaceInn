@@ -9,7 +9,7 @@ import UIKit
 import FirebaseAuth
 import FirebaseFirestore
 
-final class ManageReservationViewController: UIViewController{
+final class ManageReservationViewController: UIViewController, UISearchBarDelegate {
     
     struct Reservation {
         let id: String
@@ -27,7 +27,6 @@ final class ManageReservationViewController: UIViewController{
     private var reservations: [Reservation] = []
     private var filteredReservations: [Reservation] = []
     private let stackView = UIStackView()
-    private let searchField = UITextField()
     private let scrollView = UIScrollView()
     
     private let dateSelectButton: UIButton = {
@@ -57,24 +56,12 @@ final class ManageReservationViewController: UIViewController{
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(titleLabel)
 
-        let searchContainer = UIView()
-        searchContainer.layer.borderWidth = 1
-        searchContainer.layer.borderColor = UIColor.lightGray.cgColor
-        searchContainer.layer.cornerRadius = 8
-        searchContainer.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(searchContainer)
-
-        let searchIcon = UIImageView(image: UIImage(systemName: "magnifyingglass"))
-        searchIcon.tintColor = .gray
-        searchIcon.translatesAutoresizingMaskIntoConstraints = false
-        searchContainer.addSubview(searchIcon)
-
-        searchField.placeholder = "고객명 또는 객실번호 검색"
-        searchField.borderStyle = .none
-        searchField.clearButtonMode = .whileEditing
-        searchField.addTarget(self, action: #selector(searchFieldChanged), for: .editingChanged)
-        searchField.translatesAutoresizingMaskIntoConstraints = false
-        searchContainer.addSubview(searchField)
+        let searchBar = UISearchBar()
+        searchBar.placeholder = "고객명 또는 객실번호 검색"
+        searchBar.delegate = self
+        searchBar.searchBarStyle = .minimal
+        searchBar.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(searchBar)
 
         stackView.axis = .vertical
         stackView.spacing = 16
@@ -90,22 +77,11 @@ final class ManageReservationViewController: UIViewController{
             titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
             titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
 
-            searchContainer.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
-            searchContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            searchContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            searchContainer.heightAnchor.constraint(equalToConstant: 40),
+            searchBar.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
+            searchBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            searchBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
 
-            searchIcon.centerYAnchor.constraint(equalTo: searchContainer.centerYAnchor),
-            searchIcon.leadingAnchor.constraint(equalTo: searchContainer.leadingAnchor, constant: 10),
-            searchIcon.widthAnchor.constraint(equalToConstant: 20),
-            searchIcon.heightAnchor.constraint(equalToConstant: 20),
-
-            searchField.centerYAnchor.constraint(equalTo: searchContainer.centerYAnchor),
-            searchField.leadingAnchor.constraint(equalTo: searchIcon.trailingAnchor, constant: 8),
-            searchField.trailingAnchor.constraint(equalTo: searchContainer.trailingAnchor, constant: -10),
-            searchField.heightAnchor.constraint(equalTo: searchContainer.heightAnchor),
-
-            dateSelectButton.topAnchor.constraint(equalTo: searchContainer.bottomAnchor, constant: 12),
+            dateSelectButton.topAnchor.constraint(equalTo: searchBar.bottomAnchor, constant: 12),
             dateSelectButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             dateSelectButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             dateSelectButton.heightAnchor.constraint(equalToConstant: 40),
@@ -356,11 +332,24 @@ final class ManageReservationViewController: UIViewController{
         }
     }
     
-    @objc private func searchFieldChanged() {
-        let keyword = searchField.text?.lowercased() ?? ""
+    // UISearchBarDelegate
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        let keyword = searchText.lowercased()
+        guard let title = dateSelectButton.title(for: .normal) else { return }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy년 MM월 dd일"
+        guard let selected = formatter.date(from: title) else { return }
+        let selectedDay = Calendar.current.startOfDay(for: selected)
+
+        let dateFiltered = reservations.filter {
+            let start = Calendar.current.startOfDay(for: $0.startDate)
+            let end = Calendar.current.startOfDay(for: $0.endDate)
+            return selectedDay >= start && selectedDay <= end
+        }
+
         filteredReservations = keyword.isEmpty
-            ? reservations
-            : reservations.filter {
+            ? dateFiltered
+            : dateFiltered.filter {
                 $0.userName.lowercased().contains(keyword) ||
                 String($0.reserveNumber).contains(keyword)
             }
