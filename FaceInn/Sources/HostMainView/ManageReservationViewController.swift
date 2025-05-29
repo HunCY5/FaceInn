@@ -144,7 +144,7 @@ final class ManageReservationViewController: UIViewController, UISearchBarDelega
         // 이름, 예약번호
         let nameLabel = UILabel()
         nameLabel.text = reservation.userName
-        nameLabel.font = UIFont.boldSystemFont(ofSize: 14)
+        nameLabel.font = UIFont.boldSystemFont(ofSize: 22)
 
         let reservationNumberLabel = UILabel()
         reservationNumberLabel.text = "예약번호: \(reservation.reserveNumber)"
