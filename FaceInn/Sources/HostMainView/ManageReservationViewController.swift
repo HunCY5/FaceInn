@@ -295,6 +295,10 @@ final class ManageReservationViewController: UIViewController, UISearchBarDelega
         container.addSubview(cancelButton)
         container.addSubview(statusLabel)
         cancelButton.translatesAutoresizingMaskIntoConstraints = false
+        // 현재 시간이 체크아웃 날짜 이후라면 예약 취소 버튼 숨기기
+        if Date() > reservation.endDate {
+            cancelButton.isHidden = true
+        }
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             totalStack.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
@@ -417,6 +421,28 @@ private extension ManageReservationViewController {
 
         self.stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         self.filteredReservations.forEach { self.addReservationView($0) }
+
+        if self.filteredReservations.isEmpty {
+            let emptyLabel = UILabel()
+            emptyLabel.text = "해당 날짜에 예약 내역이 없습니다."
+            emptyLabel.font = UIFont.systemFont(ofSize: 16)
+            emptyLabel.textColor = .gray
+            emptyLabel.textAlignment = .center
+            emptyLabel.numberOfLines = 0
+            emptyLabel.translatesAutoresizingMaskIntoConstraints = false
+
+            let emptyContainer = UIView()
+            emptyContainer.translatesAutoresizingMaskIntoConstraints = false
+            emptyContainer.addSubview(emptyLabel)
+
+            NSLayoutConstraint.activate([
+                emptyLabel.centerXAnchor.constraint(equalTo: emptyContainer.centerXAnchor),
+                emptyLabel.topAnchor.constraint(equalTo: emptyContainer.topAnchor, constant: 200),
+                emptyLabel.bottomAnchor.constraint(equalTo: emptyContainer.bottomAnchor)
+            ])
+
+            self.stackView.addArrangedSubview(emptyContainer)
+        }
     }
 
     fileprivate func cancelReservation(_ reservation: Reservation) {
