@@ -170,6 +170,9 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
 
         let useFaceId = reservation["useFaceId"] as? Bool ?? false
         cell.faceIdStatusLabel.text = useFaceId ? "얼굴인식 체크인 사용" : "얼굴인식 체크인 사용 안함"
+        if let reserveNumber = reservation["reserveNumber"] as? Int {
+            cell.faceIdStatusLabel.text? += " • 예약번호: \(reserveNumber)"
+        }
 
         cell.showCancelButton(selectedTab == 0)
         cell.documentId = reservation["documentId"] as? String
