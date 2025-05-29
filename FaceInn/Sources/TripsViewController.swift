@@ -168,15 +168,16 @@ final class TripsViewController: UIViewController, UITableViewDataSource, UITabl
             cell.thumbnailImageView.image = UIImage(named: "placeholder")
         }
 
-        let useFaceId = reservation["useFaceId"] as? Bool ?? false
-        cell.faceIdStatusLabel.text = useFaceId ? "얼굴인식 체크인 사용" : "얼굴인식 체크인 사용 안함"
         if let reserveNumber = reservation["reserveNumber"] as? Int {
-            cell.faceIdStatusLabel.text? += " • 예약번호: \(reserveNumber)"
+            cell.faceIdStatusLabel.text = "예약번호: \(reserveNumber)"
+        } else {
+            cell.faceIdStatusLabel.text = "예약번호 없음"
         }
 
         cell.showCancelButton(selectedTab == 0)
         cell.documentId = reservation["documentId"] as? String
         // 얼굴인식 토글 스위치 설정
+        let useFaceId = reservation["useFaceId"] as? Bool ?? false
         cell.faceToggleSwitch.setOn(useFaceId, animated: false)
         cell.faceToggleSwitch.isHidden = (selectedTab == 1)
         cell.faceToggleLabel.isHidden = (selectedTab == 1)
