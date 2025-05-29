@@ -347,6 +347,9 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
         let numberOfNights = calendar.dateComponents([.day], from: startDate, to: endDate).day ?? 1
         let totalPrice = room.price * numberOfNights
 
+        // Generate a unique 6-digit reservation number
+        let reserveNumber = Int.random(in: 100000...999999)
+
         let reservationData: [String: Any] = [
             "userId": user.uid,
             "hostId": accommodation.hostId ?? "",
@@ -360,7 +363,8 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
             "createdAt": FieldValue.serverTimestamp(),
             "accommodationName": accommodation.name,
             "imageURL": room.imageURLs.first ?? "",
-            "useFaceId": faceIdSwitch.isOn && faceIdAvailable
+            "useFaceId": faceIdSwitch.isOn && faceIdAvailable,
+            "reserveNumber": reserveNumber
         ]
 
         Firestore.firestore().collection("reserves").addDocument(data: reservationData) { error in
