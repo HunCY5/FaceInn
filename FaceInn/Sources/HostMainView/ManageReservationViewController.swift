@@ -11,19 +11,6 @@ import FirebaseFirestore
 
 final class ManageReservationViewController: UIViewController, UISearchBarDelegate {
     
-    struct Reservation {
-        let id: String
-        let userName: String
-        let phone: String
-        let roomName: String
-        let price: Int
-        let startDate: Date
-        let endDate: Date
-        let reserveNumber: Int
-        let useFaceId: Bool
-        let checkIn: Bool?
-    }
-
     private var reservations: [Reservation] = []
     private var filteredReservations: [Reservation] = []
     private let stackView = UIStackView()

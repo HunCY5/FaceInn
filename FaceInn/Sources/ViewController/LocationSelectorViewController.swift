@@ -85,7 +85,6 @@ final class LocationSelectorViewController: UIViewController {
     }
     
     @objc private func clearSelectedLocation() {
-        // Implement your logic to clear/reset the selected location, if needed
         onLocationSelected?("위치")
         dismiss(animated: true)
     }
