@@ -364,6 +364,7 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
             "accommodationName": accommodation.name,
             "imageURL": room.imageURLs.first ?? "",
             "useFaceId": faceIdSwitch.isOn && faceIdAvailable,
+            "checkIn": false,
             "reserveNumber": reserveNumber
         ]
 
