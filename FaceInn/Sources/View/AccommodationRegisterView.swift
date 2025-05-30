@@ -403,5 +403,11 @@ final class AccommodationRegisterView: UIView {
         selectedImages.append(contentsOf: newImages)
     }
     public var logoutButton: UIButton!
-    
+
+    public var amenityButtons: [UIButton] {
+        return amenitiesStackView.arrangedSubviews
+            .compactMap { $0 as? UIStackView }
+            .flatMap { $0.arrangedSubviews }
+            .compactMap { $0 as? UIButton }
+    }
 }

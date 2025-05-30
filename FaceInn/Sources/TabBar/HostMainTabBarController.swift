@@ -47,10 +47,21 @@ final class HostMainTabBarController: UITabBarController {
             tag: 2
         )
 
+        // 4) 마이페이지 탭
+        let hostProfileNav = UINavigationController(
+            rootViewController: HostPageViewController()
+        )
+        hostProfileNav.tabBarItem = UITabBarItem(
+            title: "마이페이지",
+            image: UIImage(systemName: "person"),
+            tag: 3
+        )
+
         viewControllers = [
             manageReservationNav,
             checkInNav,
-            manageRoomNav
+            manageRoomNav,
+            hostProfileNav
         ]
     }
 }

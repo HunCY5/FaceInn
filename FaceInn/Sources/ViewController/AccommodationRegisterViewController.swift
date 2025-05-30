@@ -33,6 +33,16 @@ class AccommodationRegisterViewController: UIViewController {
             guard let self = self else { return }
             self.toggleAmenity(sender)
         }
+        
+        // Highlight amenity buttons that are selected (after amenities/buttons are created)
+        for button in registerView.amenityButtons {
+            if let title = button.title(for: .normal),
+               registerView.selectedAmenities.contains(title) {
+                button.backgroundColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 0.2)
+            } else {
+                button.backgroundColor = .clear
+            }
+        }
         registerView.deleteImageHandler = { [weak self] index in
             self?.deleteImage(index)
         }
@@ -160,7 +170,7 @@ class AccommodationRegisterViewController: UIViewController {
             registerView.selectedAmenities.remove(amenity)
             sender.backgroundColor = .clear
         } else {
-            registerView.selectedAmenities.insert(amenity)
+            self.registerView.selectedAmenities.insert(amenity)
             sender.backgroundColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 0.2)
         }
     }
