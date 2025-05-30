@@ -13,6 +13,7 @@ import FirebaseFirestore
 final class ManageRoomViewController: UIViewController{
     private var tableView: UITableView!
     private var rooms: [AccommodationRoom] = []
+    private var noRoomsLabel: UILabel!
     
     private let statusStack = UIStackView()
     
@@ -58,6 +59,20 @@ final class ManageRoomViewController: UIViewController{
         tableView.register(RoomTableViewCell.self, forCellReuseIdentifier: "RoomCell")
         tableView.dataSource = self
         
+        noRoomsLabel = UILabel()
+        noRoomsLabel.text = "객실추가 버튼을 눌러서 객실을 추가하세요."
+        noRoomsLabel.textAlignment = .center
+        noRoomsLabel.textColor = .gray
+        noRoomsLabel.font = UIFont.systemFont(ofSize: 16)
+        noRoomsLabel.translatesAutoresizingMaskIntoConstraints = false
+        noRoomsLabel.isHidden = true
+        view.addSubview(noRoomsLabel)
+
+        NSLayoutConstraint.activate([
+            noRoomsLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            noRoomsLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
+        
         fetchRooms()
     }
     
@@ -69,21 +84,9 @@ final class ManageRoomViewController: UIViewController{
             db.collection("accommodations").document(accommodationId).addSnapshotListener { snap, err in
                 guard let docData = snap?.data(), let roomDicts = docData["rooms"] as? [[String: Any]] else {
                     self.rooms = []
-                    let noRoomsLabel = UILabel()
-                    noRoomsLabel.text = "객실추가 버튼을 눌러서 객실을 추가하세요"
-                    noRoomsLabel.textAlignment = .center
-                    noRoomsLabel.textColor = .gray
-                    noRoomsLabel.font = UIFont.systemFont(ofSize: 16)
-                    noRoomsLabel.translatesAutoresizingMaskIntoConstraints = false
-                    self.view.addSubview(noRoomsLabel)
-
-                    NSLayoutConstraint.activate([
-                        noRoomsLabel.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
-                        noRoomsLabel.centerYAnchor.constraint(equalTo: self.view.centerYAnchor)
-                    ])
                     DispatchQueue.main.async {
                         self.tableView.reloadData()
-                        noRoomsLabel.isHidden = !self.rooms.isEmpty
+                        self.noRoomsLabel.isHidden = !self.rooms.isEmpty
                         self.updateStatusCounts()
                     }
                     return
@@ -93,6 +96,7 @@ final class ManageRoomViewController: UIViewController{
                     self.rooms = try JSONDecoder().decode([AccommodationRoom].self, from: jsonData)
                     DispatchQueue.main.async {
                         self.tableView.reloadData()
+                        self.noRoomsLabel.isHidden = !self.rooms.isEmpty
                         self.updateStatusCounts()
                     }
                 } catch {
