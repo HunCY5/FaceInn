@@ -315,18 +315,43 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
         mainStack.addArrangedSubview(totalPaymentStack)
         mainStack.addArrangedSubview(payButton)
 
-        view.addSubview(mainStack)
+        // MARK: - KeyboardAvoiding: UIScrollView 도입
+        let scrollView = UIScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(scrollView)
+
+        let contentView = UIView()
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(contentView)
+
+        contentView.addSubview(mainStack)
 
         NSLayoutConstraint.activate([
-            mainStack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 24),
-            mainStack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -24),
-            mainStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 24),
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+
+            contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+
+            mainStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 24),
+            mainStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
+            mainStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+            mainStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
         ])
 
         // Add tap gesture to dismiss keyboard
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
         tapGesture.cancelsTouchesInView = false
         view.addGestureRecognizer(tapGesture)
+
+        // Keyboard notification observers
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(notification:)), name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(notification:)), name: UIResponder.keyboardWillHideNotification, object: nil)
     }
     
     @objc private func saveReservationToFirestore() {
@@ -452,6 +477,24 @@ final class ReservationViewController: UIViewController, UITextFieldDelegate {
             }
         }
     }
+    // MARK: - Keyboard Handling
+    @objc private func keyboardWillShow(notification: Notification) {
+        if let keyboardSize = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue {
+            if let scrollView = self.view.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView {
+                scrollView.contentInset.bottom = keyboardSize.height + 20
+            }
+        }
+    }
+
+    @objc private func keyboardWillHide(notification: Notification) {
+        if let scrollView = self.view.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView {
+            scrollView.contentInset.bottom = 0
+        }
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 }
 
 // 얼굴 등록 완료 델리게이트 구현
@@ -469,3 +512,4 @@ private extension Int {
         return formatter.string(from: NSNumber(value: self)) ?? "\(self)"
     }
 }
+

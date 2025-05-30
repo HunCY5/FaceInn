@@ -50,6 +50,20 @@ final class ManageReservationViewController: UIViewController, UISearchBarDelega
         searchBar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(searchBar)
 
+        // Add "완료" button to keyboard and tap to dismiss keyboard
+        if let searchTextField = searchBar.value(forKey: "searchField") as? UITextField {
+            let toolbar = UIToolbar()
+            toolbar.sizeToFit()
+            let doneButton = UIBarButtonItem(title: "완료", style: .done, target: self, action: #selector(ManageReservationViewController.dismissKeyboard))
+            let flexSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+            toolbar.setItems([flexSpace, doneButton], animated: false)
+            searchTextField.inputAccessoryView = toolbar
+        }
+
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(ManageReservationViewController.dismissKeyboard))
+        tapGesture.cancelsTouchesInView = false
+        view.addGestureRecognizer(tapGesture)
+
         stackView.axis = .vertical
         stackView.spacing = 16
 
@@ -368,6 +382,16 @@ final class ManageReservationViewController: UIViewController, UISearchBarDelega
         }))
 
         self.present(alert, animated: true, completion: nil)
+    }
+}
+
+
+// MARK: - Keyboard Dismiss
+
+
+extension ManageReservationViewController {
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
     }
 }
 
