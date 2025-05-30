@@ -7,7 +7,36 @@
 
 import UIKit
 
+extension AccommodationRegisterView {
+    func showLoading() {
+        let loadingView = UIActivityIndicatorView(style: .large)
+        loadingView.center = self.center
+        loadingView.color = .gray
+        loadingView.tag = 999 // 특정 태그로 구분
+        loadingView.startAnimating()
+        self.addSubview(loadingView)
+        self.isUserInteractionEnabled = false
+    }
+
+    func hideLoading() {
+        if let loadingView = self.viewWithTag(999) as? UIActivityIndicatorView {
+            loadingView.stopAnimating()
+            loadingView.removeFromSuperview()
+        }
+        self.isUserInteractionEnabled = true
+    }
+}
+
 final class AccommodationRegisterView: UIView {
+
+    private let loadingView: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .large)
+        indicator.hidesWhenStopped = true
+        indicator.backgroundColor = UIColor(white: 0, alpha: 0.4)
+        indicator.layer.cornerRadius = 8
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        return indicator
+    }()
 
     public var selectedImages: [UIImage] = []
     public var selectedAmenities: Set<String> = []
@@ -220,6 +249,14 @@ final class AccommodationRegisterView: UIView {
         }()
         self.logoutButton = logoutButton
         contentView.addSubview(logoutButton)
+        // Add loadingView
+        addSubview(loadingView)
+        NSLayoutConstraint.activate([
+            loadingView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            loadingView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            loadingView.widthAnchor.constraint(equalTo: widthAnchor),
+            loadingView.heightAnchor.constraint(equalTo: heightAnchor)
+        ])
     }
 
     private func setupConstraints() {
@@ -366,4 +403,5 @@ final class AccommodationRegisterView: UIView {
         selectedImages.append(contentsOf: newImages)
     }
     public var logoutButton: UIButton!
+    
 }

@@ -49,15 +49,18 @@ class AccommodationRegisterViewController: UIViewController {
     }
     
     private func performAccommodationRegistration() {
+        registerView.showLoading()
         let selectedImages = registerView.selectedImages
         let selectedAmenities = registerView.selectedAmenities
         guard !selectedImages.isEmpty else {
+            registerView.hideLoading()
             let alert = UIAlertController(title: "오류", message: "최소 한 장 이상의 사진을 등록해주세요.", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "확인", style: .default))
             present(alert, animated: true)
             return
         }
         guard !selectedAmenities.isEmpty else {
+            registerView.hideLoading()
             let alert = UIAlertController(title: "오류", message: "최소 하나 이상의 편의시설을 선택해주세요.", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "확인", style: .default))
             present(alert, animated: true)
@@ -66,6 +69,7 @@ class AccommodationRegisterViewController: UIViewController {
         guard let name = registerView.nameTextField.text, !name.isEmpty,
               let address = registerView.addressTextField.text, !address.isEmpty,
               let description = registerView.descriptionTextField.text, !description.isEmpty else {
+            registerView.hideLoading()
             let alert = UIAlertController(title: "오류", message: "모든 숙소 정보를 입력해주세요.", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "확인", style: .default))
             present(alert, animated: true)
@@ -74,6 +78,7 @@ class AccommodationRegisterViewController: UIViewController {
 
         guard let hostId = Auth.auth().currentUser?.uid else {
             print("로그인된 사용자 정보 없음")
+            registerView.hideLoading()
             return
         }
         let storageRef = Storage.storage().reference()
@@ -117,12 +122,14 @@ class AccommodationRegisterViewController: UIViewController {
                 guard let self = self else { return }
                 if let error = error {
                     print("숙소 저장 실패: \(error)")
+                    self.registerView.hideLoading()
                 } else if let documentID = newDocumentRef?.documentID {
                     Firestore.firestore().collection("users").document(hostId).updateData([
                         "accommodationId": documentID
                     ]) { error in
                         if let error = error {
                             print("사용자 문서 업데이트 실패: \(error)")
+                            self.registerView.hideLoading()
                         } else {
                             print("사용자 문서에 accommodationId 업데이트 완료")
                         }
@@ -130,6 +137,7 @@ class AccommodationRegisterViewController: UIViewController {
 
                     let alert = UIAlertController(title: "성공", message: "숙소가 등록되었습니다.", preferredStyle: .alert)
                     alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
+                        self.registerView.hideLoading()
                         if let sceneDelegate = UIApplication.shared.connectedScenes.first?.delegate as? SceneDelegate {
                             let hostTabBar = HostMainTabBarController()
                             sceneDelegate.window?.rootViewController = hostTabBar
@@ -259,3 +267,4 @@ extension AccommodationRegisterViewController: UICollectionViewDataSource {
         }
     }
 }
+
