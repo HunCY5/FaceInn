@@ -50,10 +50,36 @@ final class FaceCaptureViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+        // 카메라 배경 어둡게 처리
+        let dimView = UIView(frame: view.bounds)
+        dimView.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        dimView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(dimView)
+
+        // 원형 컨테이너 안에 카메라 미리보기
+        let cameraSize: CGFloat = min(view.bounds.width, view.bounds.height) * 0.9
+        let cameraContainer = UIView(frame: CGRect(
+            x: (view.bounds.width - cameraSize) / 2,
+            y: (view.bounds.height - cameraSize) / 2,
+            width: cameraSize,
+            height: cameraSize
+        ))
+        cameraContainer.layer.cornerRadius = cameraSize / 2
+        cameraContainer.layer.masksToBounds = true
+        cameraContainer.backgroundColor = .clear
+        cameraContainer.autoresizingMask = [.flexibleLeftMargin, .flexibleRightMargin,
+                                            .flexibleTopMargin, .flexibleBottomMargin]
+        view.addSubview(cameraContainer)
+
+        // 컨테이너 뷰 안에 카메라 프리뷰 레이어 배치
         setupCamera()
-        view.addSubview(guideOverlayView)
-        guideOverlayView.frame = view.bounds
+        previewLayer.frame = cameraContainer.bounds
+        cameraContainer.layer.insertSublayer(previewLayer, at: 0)
+
+        // 가이드 오버레이 뷰를 카메라 컨테이너에 추가하고 크기 맞춤
+        guideOverlayView.frame = cameraContainer.bounds
         guideOverlayView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        cameraContainer.addSubview(guideOverlayView)
         guideOverlayView.currentPosition = currentFacePosition
         setupCaptureButton()
     }
@@ -87,8 +113,8 @@ final class FaceCaptureViewController: UIViewController {
 
         previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
         previewLayer.videoGravity = .resizeAspectFill
-        previewLayer.frame = view.bounds
-        view.layer.insertSublayer(previewLayer, at: 0)
+
+        // previewLayer.frame: viewDidLoad에서 cameraContainer에 삽입
 
         captureSession.startRunning()
     }
@@ -259,25 +285,75 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
                 Int(self.view.bounds.height)
             )
 
-            let guideRect = CGRect(
-                x: self.view.bounds.midX - 150,
-                y: self.view.bounds.midY - 180,
-                width: 300,
-                height: 360
-            )
+            // 얼굴 위치(currentFacePosition)에 따라 인식 영역 설정
+            let guideRect: CGRect
+            switch currentFacePosition {
+            case .front:
+                // 정면 가이드 영역
+                guideRect = CGRect(
+                    x: view.bounds.midX - 150,
+                    y: view.bounds.midY - 140,
+                    width: 300,
+                    height: 280
+                )
+            case .left:
+                // 왼쪽 가이드 영역
+                guideRect = CGRect(
+                    x: view.bounds.midX - 200,
+                    y: view.bounds.midY - 140,
+                    width: 310,
+                    height: 280
+                )
+            case .right:
+                // 오른쪽 가이드 영역
+                guideRect = CGRect(
+                    x: view.bounds.midX - 110,
+                    y: view.bounds.midY - 140,
+                    width: 310,
+                    height: 280
+                )
+            }
 
+            // guideRect와 faceRect의 겹치는 영역 계산
             let intersection = guideRect.intersection(faceRect)
+            // 겹치는 영역의 넓이
             let intersectionArea = intersection.width * intersection.height
+            // 얼굴 사각형 전체 넓이
             let faceArea = faceRect.width * faceRect.height
-            let isWithinGuide = faceArea > 0 && (intersectionArea / faceArea > 0.7)
+            // 세로 방향 포함 비율 계산
+            let heightRatio = intersection.height / faceRect.height
+            // 정면 or 측면 면적 및 높이 기준 설정 (정면: 엄격, 측면: 느슨)
+            let areaThreshold: CGFloat = (currentFacePosition == .front) ? 0.55 : 0.45
+            let heightThreshold: CGFloat = (currentFacePosition == .front) ? 0.5 : 0.4
+            // 가로·세로 면적 기준
+            let isWithinGuideArea = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
+            // 세로 높이 기준
+            let isWithinGuideHeight = heightRatio > heightThreshold
+            // 최종 가이드 기준 (면적 및 높이 기준 모두 만족해야 유효)
+            let isWithinGuide = isWithinGuideArea && isWithinGuideHeight
 
+            // 얼굴이 충분히 가까이(너비 기준) 들어왔는지 확인하기 위한 최소 너비 기준
             let minFaceWidth: CGFloat = 85
-            let minFaceHeight: CGFloat = 100
+            // 얼굴이 충분히 가까이(높이 기준) 들어왔는지 확인하기 위한 최소 높이 기준
+            let minFaceHeight: CGFloat = 85
+            // 얼굴 크기(width, height)가 최소 기준 이상인지 확인
             let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
 
+            // 가이드 내 포함 여부와 크기 기준을 모두 만족해야 유효한 얼굴로 간주
             let isValidFace = isWithinGuide && isFaceLargeEnough
 
             DispatchQueue.main.async {
+                // 테스트용 사각형 디버깅 뷰 제거
+                self.view.viewWithTag(999)?.removeFromSuperview()
+                // 테스트용 사각형 디버깅 뷰 생성
+                // guideRect는 self.view의 좌표계이므로 바로 사용 (만약 container라면 변환 필요)
+                let debugRectInView = self.view.convert(guideRect, from: self.view)
+                let debugView = UIView(frame: debugRectInView)
+                debugView.layer.borderWidth = 2
+                debugView.layer.borderColor = UIColor.yellow.cgColor
+                debugView.backgroundColor = .clear
+                debugView.tag = 999
+                self.view.addSubview(debugView)
                 self.guideOverlayView.strokeColor = isValidFace ? .green : .red
                 self.isFaceDetected = isValidFace
                 if isValidFace {
