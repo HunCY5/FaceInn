@@ -416,7 +416,7 @@ final class RoomRegisterView: UIView {
         ])
     }
 
-    @objc private func toggleAmenity(_ sender: UIButton) {
+    @objc func toggleAmenity(_ sender: UIButton) {
         if sender.backgroundColor == UIColor.white {
             sender.backgroundColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
             sender.setTitleColor(.white, for: .normal)

@@ -202,6 +202,7 @@ final class RoomTableViewCell: UITableViewCell {
         editButton.backgroundColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
         editButton.layer.cornerRadius = 8
         editButton.titleLabel?.font = UIFont.systemFont(ofSize: 14)
+        editButton.addTarget(self, action: #selector(editButtonTapped), for: .touchUpInside)
 
         nameLabel.font = UIFont.boldSystemFont(ofSize: 16)
 
@@ -240,5 +241,29 @@ final class RoomTableViewCell: UITableViewCell {
             editButton.heightAnchor.constraint(equalToConstant: 36),
             editButton.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -16)
         ])
+    }
+
+    @objc private func editButtonTapped() {
+        guard let currentRoom = currentRoom else { return }
+        let editVC = EditRoomViewController()
+        editVC.configure(with: currentRoom.id)
+
+        if let viewController = self.findViewController() {
+            editVC.hidesBottomBarWhenPushed = true
+            viewController.navigationController?.pushViewController(editVC, animated: true)
+        }
+    }
+}
+
+extension UIView {
+    func findViewController() -> UIViewController? {
+        var nextResponder: UIResponder? = self
+        while let responder = nextResponder {
+            if let viewController = responder as? UIViewController {
+                return viewController
+            }
+            nextResponder = responder.next
+        }
+        return nil
     }
 }

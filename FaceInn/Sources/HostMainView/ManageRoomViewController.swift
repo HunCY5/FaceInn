@@ -52,7 +52,7 @@ final class ManageRoomViewController: UIViewController{
             tableView.topAnchor.constraint(equalTo: statusStack.bottomAnchor, constant: 16),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            tableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
         ])
         
         tableView.register(RoomTableViewCell.self, forCellReuseIdentifier: "RoomCell")
