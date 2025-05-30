@@ -7,6 +7,7 @@
 
 
 import UIKit
+import Kingfisher
 import PhotosUI
 import FirebaseFirestore
 import FirebaseStorage
@@ -51,15 +52,19 @@ class EditAccommodationViewController: UIViewController {
                             if let imageURLs = docData["imageURLs"] as? [String] {
                                 for urlString in imageURLs {
                                     if let url = URL(string: urlString) {
-                                        URLSession.shared.dataTask(with: url) { data, _, _ in
-                                            if let data = data, let image = UIImage(data: data) {
+                                        let imageView = UIImageView()
+                                        imageView.kf.setImage(with: url) { result in
+                                            switch result {
+                                            case .success(let value):
                                                 DispatchQueue.main.async {
-                                                    self.editView.selectedImages.append(image)
+                                                    self.editView.selectedImages.append(value.image)
                                                     self.editView.collectionView.reloadData()
                                                     self.editView.photoCountLabel.text = "\(self.editView.selectedImages.count) / 10"
                                                 }
+                                            case .failure(let error):
+                                                print("Kingfisher failed to load image: \(error)")
                                             }
-                                        }.resume()
+                                        }
                                     }
                                 }
                             }
