@@ -375,23 +375,33 @@ private func fetchReservations() {
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         let keyword = searchText.lowercased()
         guard let title = dateSelectButton.title(for: .normal) else { return }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy년 MM월 dd일"
-        guard let selected = formatter.date(from: title) else { return }
-        let selectedDay = Calendar.current.startOfDay(for: selected)
 
-        let dateFiltered = reservations.filter {
-            let start = Calendar.current.startOfDay(for: $0.startDate)
-            let end = Calendar.current.startOfDay(for: $0.endDate)
-            return selectedDay >= start && selectedDay <= end
-        }
+        if title == "날짜 선택" {
+            filteredReservations = keyword.isEmpty
+                ? reservations
+                : reservations.filter {
+                    $0.userName.lowercased().contains(keyword) ||
+                    String($0.reserveNumber).contains(keyword)
+                }
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy년 MM월 dd일"
+            guard let selected = formatter.date(from: title) else { return }
+            let selectedDay = Calendar.current.startOfDay(for: selected)
 
-        filteredReservations = keyword.isEmpty
-            ? dateFiltered
-            : dateFiltered.filter {
-                $0.userName.lowercased().contains(keyword) ||
-                String($0.reserveNumber).contains(keyword)
+            let dateFiltered = reservations.filter {
+                let start = Calendar.current.startOfDay(for: $0.startDate)
+                let end = Calendar.current.startOfDay(for: $0.endDate)
+                return selectedDay >= start && selectedDay <= end
             }
+
+            filteredReservations = keyword.isEmpty
+                ? dateFiltered
+                : dateFiltered.filter {
+                    $0.userName.lowercased().contains(keyword) ||
+                    String($0.reserveNumber).contains(keyword)
+                }
+        }
 
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         filteredReservations.forEach { addReservationView($0) }
