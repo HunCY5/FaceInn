@@ -38,14 +38,25 @@ final class HostLoginViewController: UIViewController {
                     // UserDefaults에 호스트 타입 저장
                     UserDefaults.standard.set("host", forKey: "userType")
                     
-                    // 루트뷰를 HostMainTabBarController로 교체
-                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                       let sceneDelegate = windowScene.delegate as? SceneDelegate,
-                       let window = sceneDelegate.window {
-                        window.rootViewController = HostMainTabBarController()
-                        window.makeKeyAndVisible()
+                    guard let user = Auth.auth().currentUser else { return }
+                    Firestore.firestore().collection("users").document(user.uid).getDocument { snapshot, error in
+                        if let document = snapshot, document.exists {
+                            let data = document.data()
+                            let accommodationId = data?["accommodationId"] as? String ?? ""
+                            DispatchQueue.main.async {
+                                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                   let sceneDelegate = windowScene.delegate as? SceneDelegate,
+                                   let window = sceneDelegate.window {
+                                    if accommodationId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                        window.rootViewController = UINavigationController(rootViewController: AccommodationRegisterViewController())
+                                    } else {
+                                        window.rootViewController = HostMainTabBarController()
+                                    }
+                                    window.makeKeyAndVisible()
+                                }
+                            }
+                        }
                     }
-
 
                 case .failure(let error):
                     try? Auth.auth().signOut()
