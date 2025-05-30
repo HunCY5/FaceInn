@@ -127,8 +127,8 @@ private func fetchReservations() {
     let db = Firestore.firestore()
     self.dbListener = db.collection("reserves").whereField("hostId", isEqualTo: hostId).addSnapshotListener { snapshot, error in
         guard let documents = snapshot?.documents else { return }
-        self.reservations.removeAll()
         let group = DispatchGroup()
+        var newReservations: [Reservation] = []
         for doc in documents {
             group.enter()
             let data = doc.data()
@@ -146,10 +146,14 @@ private func fetchReservations() {
                 let useFaceId = data["useFaceId"] as? Bool ?? false
                 let checkIn = data["checkIn"] as? Bool
                 let reservation = Reservation(id: doc.documentID, userName: name, phone: phone, roomName: roomName, price: price, startDate: startDate, endDate: endDate, reserveNumber: reserveNumber, useFaceId: useFaceId, checkIn: checkIn)
-                self.reservations.append(reservation)
+                if !newReservations.contains(where: { $0.id == reservation.id }) {
+                    newReservations.append(reservation)
+                }
             }
         }
         group.notify(queue: .main) {
+            self.reservations.removeAll()
+            self.reservations.append(contentsOf: newReservations)
             // 날짜 선택 버튼이 "날짜 선택"일 경우, 오늘 이후 전체 예약 보여주기
             if self.dateSelectButton.title(for: .normal) == "날짜 선택" {
                 self.filteredReservations = self.reservations.filter {
