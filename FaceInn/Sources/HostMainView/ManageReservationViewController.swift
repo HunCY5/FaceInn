@@ -15,6 +15,7 @@ final class ManageReservationViewController: UIViewController, UISearchBarDelega
     private var filteredReservations: [Reservation] = []
     private let stackView = UIStackView()
     private let scrollView = UIScrollView()
+    private var dbListener: ListenerRegistration?
     
     private let dateSelectButton: UIButton = {
         let button = UIButton(type: .system)
@@ -27,6 +28,17 @@ final class ManageReservationViewController: UIViewController, UISearchBarDelega
         button.backgroundColor = .white
         button.layer.borderColor = UIColor.lightGray.cgColor
         button.layer.borderWidth = 1
+        button.layer.cornerRadius = 8
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
+    private let allReservationsButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("모든 예약 보기", for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.backgroundColor = UIColor(red: 0x2f/255, green: 0xaf/255, blue: 0x53/255, alpha: 1)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         button.layer.cornerRadius = 8
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
@@ -50,7 +62,9 @@ final class ManageReservationViewController: UIViewController, UISearchBarDelega
         searchBar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(searchBar)
 
-        // Add "완료" button to keyboard and tap to dismiss keyboard
+        view.addSubview(allReservationsButton)
+        allReservationsButton.addTarget(self, action: #selector(showAllUpcomingReservations), for: .touchUpInside)
+
         if let searchTextField = searchBar.value(forKey: "searchField") as? UITextField {
             let toolbar = UIToolbar()
             toolbar.sizeToFit()
@@ -84,8 +98,13 @@ final class ManageReservationViewController: UIViewController, UISearchBarDelega
 
             dateSelectButton.topAnchor.constraint(equalTo: searchBar.bottomAnchor, constant: 12),
             dateSelectButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            dateSelectButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            dateSelectButton.trailingAnchor.constraint(equalTo: allReservationsButton.leadingAnchor, constant: -8),
             dateSelectButton.heightAnchor.constraint(equalToConstant: 40),
+
+            allReservationsButton.topAnchor.constraint(equalTo: dateSelectButton.topAnchor),
+            allReservationsButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            allReservationsButton.widthAnchor.constraint(equalToConstant: 120),
+            allReservationsButton.heightAnchor.constraint(equalToConstant: 40),
 
             scrollView.topAnchor.constraint(equalTo: dateSelectButton.bottomAnchor, constant: 20),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -102,38 +121,49 @@ final class ManageReservationViewController: UIViewController, UISearchBarDelega
         fetchReservations()
     }
     
-    private func fetchReservations() {
-        guard let hostId = Auth.auth().currentUser?.uid else { return }
-        let db = Firestore.firestore()
-        db.collection("reserves").whereField("hostId", isEqualTo: hostId).addSnapshotListener { snapshot, error in
-            guard let documents = snapshot?.documents else { return }
-            self.reservations.removeAll()
-            let group = DispatchGroup()
-            for doc in documents {
-                group.enter()
-                let data = doc.data()
-                let userId = data["userId"] as? String ?? ""
-                db.collection("users").document(userId).getDocument { userDoc, _ in
-                    defer { group.leave() }
-                    let userData = userDoc?.data()
-                    let name = userData?["name"] as? String ?? "알 수 없음"
-                    let phone = userData?["phoneNumber"] as? String ?? "-"
-                    let roomName = data["roomName"] as? String ?? ""
-                    let price = data["totalPrice"] as? Int ?? 0
-                    let startDate = (data["startDate"] as? Timestamp)?.dateValue() ?? Date()
-                    let endDate = (data["endDate"] as? Timestamp)?.dateValue() ?? Date()
-                    let reserveNumber = data["reserveNumber"] as? Int ?? 0
-                    let useFaceId = data["useFaceId"] as? Bool ?? false
-                    let checkIn = data["checkIn"] as? Bool
-                    let reservation = Reservation(id: doc.documentID, userName: name, phone: phone, roomName: roomName, price: price, startDate: startDate, endDate: endDate, reserveNumber: reserveNumber, useFaceId: useFaceId, checkIn: checkIn)
-                    self.reservations.append(reservation)
-                }
+private func fetchReservations() {
+    self.dbListener?.remove()
+    guard let hostId = Auth.auth().currentUser?.uid else { return }
+    let db = Firestore.firestore()
+    self.dbListener = db.collection("reserves").whereField("hostId", isEqualTo: hostId).addSnapshotListener { snapshot, error in
+        guard let documents = snapshot?.documents else { return }
+        self.reservations.removeAll()
+        let group = DispatchGroup()
+        for doc in documents {
+            group.enter()
+            let data = doc.data()
+            let userId = data["userId"] as? String ?? ""
+            db.collection("users").document(userId).getDocument { userDoc, _ in
+                defer { group.leave() }
+                let userData = userDoc?.data()
+                let name = userData?["name"] as? String ?? "알 수 없음"
+                let phone = userData?["phoneNumber"] as? String ?? "-"
+                let roomName = data["roomName"] as? String ?? ""
+                let price = data["totalPrice"] as? Int ?? 0
+                let startDate = (data["startDate"] as? Timestamp)?.dateValue() ?? Date()
+                let endDate = (data["endDate"] as? Timestamp)?.dateValue() ?? Date()
+                let reserveNumber = data["reserveNumber"] as? Int ?? 0
+                let useFaceId = data["useFaceId"] as? Bool ?? false
+                let checkIn = data["checkIn"] as? Bool
+                let reservation = Reservation(id: doc.documentID, userName: name, phone: phone, roomName: roomName, price: price, startDate: startDate, endDate: endDate, reserveNumber: reserveNumber, useFaceId: useFaceId, checkIn: checkIn)
+                self.reservations.append(reservation)
             }
-            group.notify(queue: .main) {
+        }
+        group.notify(queue: .main) {
+            // 날짜 선택 버튼이 "날짜 선택"일 경우, 오늘 이후 전체 예약 보여주기
+            if self.dateSelectButton.title(for: .normal) == "날짜 선택" {
+                self.filteredReservations = self.reservations.filter {
+                    $0.endDate >= Calendar.current.startOfDay(for: Date())
+                }.sorted(by: { $0.startDate < $1.startDate })
+                self.stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+                self.filteredReservations.forEach { self.addReservationView($0) }
+            } else {
                 self.reloadFilteredReservations()
+                return
             }
         }
     }
+}
     
     private func addReservationView(_ reservation: Reservation) {
         let container = UIView()
@@ -472,5 +502,13 @@ private extension ManageReservationViewController {
     internal override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         reloadFilteredReservations()
+    }
+}
+
+
+extension ManageReservationViewController {
+    @objc private func showAllUpcomingReservations() {
+        self.dateSelectButton.setTitle("날짜 선택", for: .normal)
+        fetchReservations()
     }
 }
