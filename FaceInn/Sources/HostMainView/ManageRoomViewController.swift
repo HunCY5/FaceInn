@@ -31,6 +31,8 @@ final class ManageRoomViewController: UIViewController{
         addButton.translatesAutoresizingMaskIntoConstraints = false
         addButton.setTitleColor(UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1), for: .normal)
         view.addSubview(addButton)
+        
+        addButton.addTarget(self, action: #selector(didTapAddRoom), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
             titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
@@ -64,8 +66,15 @@ final class ManageRoomViewController: UIViewController{
         let db = Firestore.firestore()
         db.collection("users").document(uid).getDocument { snapshot, error in
             guard let data = snapshot?.data(), let accommodationId = data["accommodationId"] as? String else { return }
-            db.collection("accommodations").document(accommodationId).getDocument { snap, err in
-                guard let docData = snap?.data(), let roomDicts = docData["rooms"] as? [[String: Any]] else { return }
+            db.collection("accommodations").document(accommodationId).addSnapshotListener { snap, err in
+                guard let docData = snap?.data(), let roomDicts = docData["rooms"] as? [[String: Any]] else {
+                    self.rooms = []
+                    DispatchQueue.main.async {
+                        self.tableView.reloadData()
+                        self.updateStatusCounts()
+                    }
+                    return
+                }
                 do {
                     let jsonData = try JSONSerialization.data(withJSONObject: roomDicts)
                     self.rooms = try JSONDecoder().decode([AccommodationRoom].self, from: jsonData)
@@ -208,6 +217,12 @@ final class ManageRoomViewController: UIViewController{
                 }
             }
         }
+    }
+    
+    @objc private func didTapAddRoom() {
+        let registerVC = RoomRegisterViewController()
+        registerVC.hidesBottomBarWhenPushed = true
+        self.navigationController?.pushViewController(registerVC, animated: true)
     }
 }
 
