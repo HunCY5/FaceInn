@@ -56,7 +56,7 @@ final class ManageReservationViewController: UIViewController, UISearchBarDelega
         view.addSubview(titleLabel)
 
         let searchBar = UISearchBar()
-        searchBar.placeholder = "고객명 또는 객실번호 검색"
+        searchBar.placeholder = "고객명 또는 예약번호 검색"
         searchBar.delegate = self
         searchBar.searchBarStyle = .minimal
         searchBar.translatesAutoresizingMaskIntoConstraints = false
