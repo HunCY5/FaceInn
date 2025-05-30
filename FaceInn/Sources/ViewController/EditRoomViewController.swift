@@ -144,6 +144,9 @@ final class EditRoomViewController: UIViewController, UICollectionViewDataSource
                                     print("Error updating room: \(error)")
                                 } else {
                                     self.navigationController?.popViewController(animated: true)
+                                    let alert = UIAlertController(title: "완료", message: "객실이 수정되었습니다.", preferredStyle: .alert)
+                                    alert.addAction(UIAlertAction(title: "확인", style: .default))
+                                    self.present(alert, animated: true)
                                 }
                             }
                         } else {
