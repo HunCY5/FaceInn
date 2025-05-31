@@ -39,19 +39,13 @@ final class FaceGuideOverlayView: UIView {
     var currentPosition: FacePosition = .front {
         didSet {
             setNeedsDisplay()
-            updateGuidanceText()
         }
     }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .clear
-        addSubview(guidanceLabel)
-        NSLayoutConstraint.activate([
-            guidanceLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            guidanceLabel.topAnchor.constraint(equalTo: topAnchor, constant: 80)
-        ])
-        updateGuidanceText()
+        // Remove guidanceLabel from overlay
         isUserInteractionEnabled = false
     }
 
@@ -142,17 +136,7 @@ final class FaceGuideOverlayView: UIView {
         ))
         context.strokePath()
     }
-    // 현재 얼굴 위치에 따라 상단에 표시되는 안내 문구를 업데이트
-    private func updateGuidanceText() {
-        switch currentPosition {
-        case .front:
-            guidanceLabel.text = "얼굴 정면을 보여주세요"
-        case .left:
-            guidanceLabel.text = "얼굴 우측을 보여주세요"
-        case .right:
-            guidanceLabel.text = "얼굴 좌측을 보여주세요"
-        }
-    }
+    // 안내 문구 레이블 제거됨 (FaceCaptureViewController에서 라벨 직접 추가)
 }
 
 extension FaceGuideOverlayView.FacePosition: CustomStringConvertible {

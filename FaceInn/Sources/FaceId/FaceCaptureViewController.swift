@@ -71,6 +71,18 @@ final class FaceCaptureViewController: UIViewController {
                                             .flexibleTopMargin, .flexibleBottomMargin]
         view.addSubview(cameraContainer)
 
+        // 상단 안내 라벨 추가
+        let topLabel = UILabel()
+        topLabel.text = "얼굴 정면을 보여주세요"
+        topLabel.textColor = .white
+        topLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        topLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(topLabel)
+        NSLayoutConstraint.activate([
+            topLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            topLabel.bottomAnchor.constraint(equalTo: cameraContainer.topAnchor, constant: -16)
+        ])
+
         // 컨테이너 뷰 안에 카메라 프리뷰 레이어 배치
         setupCamera()
         previewLayer.frame = cameraContainer.bounds
@@ -134,7 +146,7 @@ final class FaceCaptureViewController: UIViewController {
     // 촬영 버튼 UI 구성 및 눌렀을 때 행동 설정
     private func setupCaptureButton() {
         let button = UIButton(type: .system)
-        button.setTitle("촬영", for: .normal)
+        button.setTitle("촬영시작", for: .normal)
         button.setTitleColor(.white, for: .normal)
         button.backgroundColor = UIColor.systemGreen
         button.layer.cornerRadius = 30
@@ -266,102 +278,295 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
-        let request = VNDetectFaceRectanglesRequest { [weak self] req, err in
-            guard let self = self else { return }
-
-            guard let observations = req.results as? [VNFaceObservation],
-                  let observation = observations.first else {
-                DispatchQueue.main.async {
-                    self.guideOverlayView.strokeColor = .red
-                    self.isFaceDetected = false
-                }
-                return
-            }
-
-            let faceRect = VNImageRectForNormalizedRect(
-                observation.boundingBox,
-                Int(self.view.bounds.width),
-                Int(self.view.bounds.height)
-            )
-
-            // 얼굴 위치(currentFacePosition)에 따라 인식 영역 설정
-            let guideRect: CGRect
-            switch currentFacePosition {
-            case .front:
-                // 정면 가이드 영역
-                guideRect = CGRect(
-                    x: view.bounds.midX - 150,
-                    y: view.bounds.midY - 140,
-                    width: 300,
-                    height: 280
-                )
-            case .left:
-                // 왼쪽 가이드 영역
-                guideRect = CGRect(
-                    x: view.bounds.midX - 200,
-                    y: view.bounds.midY - 140,
-                    width: 310,
-                    height: 280
-                )
-            case .right:
-                // 오른쪽 가이드 영역
-                guideRect = CGRect(
-                    x: view.bounds.midX - 110,
-                    y: view.bounds.midY - 140,
-                    width: 310,
-                    height: 280
-                )
-            }
-
-            // guideRect와 faceRect의 겹치는 영역 계산
-            let intersection = guideRect.intersection(faceRect)
-            // 겹치는 영역의 넓이
-            let intersectionArea = intersection.width * intersection.height
-            // 얼굴 사각형 전체 넓이
-            let faceArea = faceRect.width * faceRect.height
-            // 세로 방향 포함 비율 계산
-            let heightRatio = intersection.height / faceRect.height
-            // 정면 or 측면 면적 및 높이 기준 설정 (정면: 엄격, 측면: 느슨)
-            let areaThreshold: CGFloat = (currentFacePosition == .front) ? 0.55 : 0.45
-            let heightThreshold: CGFloat = (currentFacePosition == .front) ? 0.5 : 0.4
-            // 가로·세로 면적 기준
-            let isWithinGuideArea = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
-            // 세로 높이 기준
-            let isWithinGuideHeight = heightRatio > heightThreshold
-            // 최종 가이드 기준 (면적 및 높이 기준 모두 만족해야 유효)
-            let isWithinGuide = isWithinGuideArea && isWithinGuideHeight
-
-            // 얼굴이 충분히 가까이(너비 기준) 들어왔는지 확인하기 위한 최소 너비 기준
-            let minFaceWidth: CGFloat = 85
-            // 얼굴이 충분히 가까이(높이 기준) 들어왔는지 확인하기 위한 최소 높이 기준
-            let minFaceHeight: CGFloat = 85
-            // 얼굴 크기(width, height)가 최소 기준 이상인지 확인
-            let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
-
-            // 가이드 내 포함 여부와 크기 기준을 모두 만족해야 유효한 얼굴로 간주
-            let isValidFace = isWithinGuide && isFaceLargeEnough
-
-            DispatchQueue.main.async {
-                // 테스트용 사각형 디버깅 뷰 제거
-                self.view.viewWithTag(999)?.removeFromSuperview()
-                // 테스트용 사각형 디버깅 뷰 생성
-                // guideRect는 self.view의 좌표계이므로 바로 사용 (만약 container라면 변환 필요)
-                let debugRectInView = self.view.convert(guideRect, from: self.view)
-                let debugView = UIView(frame: debugRectInView)
-                debugView.layer.borderWidth = 2
-                debugView.layer.borderColor = UIColor.yellow.cgColor
-                debugView.backgroundColor = .clear
-                debugView.tag = 999
-                self.view.addSubview(debugView)
-                self.guideOverlayView.strokeColor = isValidFace ? .green : .red
-                self.isFaceDetected = isValidFace
-                if isValidFace {
-                    self.currentSampleBuffer = sampleBuffer
-                }
-            }
+        // 현재 얼굴 위치에 따라 guideRect 정의 (UIKit 좌표계)
+        let guideRectInView: CGRect
+        switch currentFacePosition {
+        case .front:
+            guideRectInView = CGRect(x: view.bounds.midX - 150,
+                                     y: view.bounds.midY - 140,
+                                     width: 300,
+                                     height: 280)
+        case .left:
+            guideRectInView = CGRect(x: view.bounds.midX - 200,
+                                     y: view.bounds.midY - 140,
+                                     width: 310,
+                                     height: 280)
+        case .right:
+            guideRectInView = CGRect(x: view.bounds.midX - 110,
+                                     y: view.bounds.midY - 140,
+                                     width: 310,
+                                     height: 280)
         }
 
-        try? handler.perform([request])
+        // UIKit의 guideRect를 Vision의 정규화된 regionOfInterest 좌표로 변환
+        let normalizedX      = guideRectInView.origin.x / view.bounds.width
+        let normalizedY      = (view.bounds.height - guideRectInView.origin.y - guideRectInView.height) / view.bounds.height
+        let normalizedWidth  = guideRectInView.width / view.bounds.width
+        let normalizedHeight = guideRectInView.height / view.bounds.height
+
+        let normalizedGuideRect = CGRect(x: normalizedX,
+                                         y: normalizedY,
+                                         width: normalizedWidth,
+                                         height: normalizedHeight)
+
+        // 디버깅: orientation 파라미터 추가(.leftMirrored 확인) 및 regionOfInterest 임시 주석 처리
+        let orientation: CGImagePropertyOrientation = .leftMirrored
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer,
+                                            orientation: orientation,
+                                            options: [:])
+        if currentFacePosition == .front {
+            // 정면 모드: 랜드마크(눈, 코, 입) 검출을 시도하여 가이드 영역 내 여부를 확인
+            let landmarksRequest = VNDetectFaceLandmarksRequest { [weak self] request, error in
+                guard let self = self else { return }
+
+                // 랜드마크 검출이 성공하고 얼굴이 인식된 경우
+                if let observations = request.results as? [VNFaceObservation],
+                   let observation = observations.first,
+                   let landmarks = observation.landmarks {
+
+                    // 인식된 얼굴 boundingBox를 뷰 좌표로 변환하고, 랜드마크 좌표를 뷰 좌표로 매핑
+                    let faceRect = VNImageRectForNormalizedRect(
+                        observation.boundingBox,
+                        Int(self.view.bounds.width),
+                        Int(self.view.bounds.height)
+                    )
+
+                    let guideRect: CGRect
+                    switch self.currentFacePosition {
+                    case .front:
+                        guideRect = CGRect(x: self.view.bounds.midX - 150,
+                                           y: self.view.bounds.midY - 140,
+                                           width: 300, height: 280)
+                    case .left:
+                        guideRect = CGRect(x: self.view.bounds.midX - 200,
+                                           y: self.view.bounds.midY - 140,
+                                           width: 310, height: 280)
+                    case .right:
+                        guideRect = CGRect(x: self.view.bounds.midX - 110,
+                                           y: self.view.bounds.midY - 140,
+                                           width: 310, height: 280)
+                    }
+
+                    func convertLandmarkPoint(_ pt: CGPoint) -> CGPoint {
+                        let x = faceRect.origin.x + pt.x * faceRect.width
+                        let y = self.view.bounds.height - (faceRect.origin.y + pt.y * faceRect.height)
+                        return CGPoint(x: x, y: y)
+                    }
+
+                    let leftEyePoints = landmarks.leftEye?.normalizedPoints.map(convertLandmarkPoint) ?? []
+                    let rightEyePoints = landmarks.rightEye?.normalizedPoints.map(convertLandmarkPoint) ?? []
+                    let nosePoints = landmarks.nose?.normalizedPoints.map(convertLandmarkPoint) ?? []
+                    let mouthPoints = (landmarks.outerLips?.normalizedPoints.map(convertLandmarkPoint)) ??
+                                      (landmarks.innerLips?.normalizedPoints.map(convertLandmarkPoint)) ?? []
+
+                    // 각 랜드마크(왼쪽 눈, 오른쪽 눈, 코, 입) 점 개수 기준 검증
+                    let hasLeftEye = leftEyePoints.count >= 3
+                    let hasRightEye = rightEyePoints.count >= 3
+                    let hasNose = nosePoints.count >= 3
+                    let hasMouth = mouthPoints.count >= 3
+
+                    // 랜드마크 점들의 중심 좌표(centroid) 계산 함수
+                    func centroid(of points: [CGPoint]) -> CGPoint {
+                        let sum = points.reduce(CGPoint.zero) { CGPoint(x: $0.x + $1.x, y: $0.y + $1.y) }
+                        return CGPoint(x: sum.x / CGFloat(points.count), y: sum.y / CGFloat(points.count))
+                    }
+
+                    // 모든 랜드마크 중심이 가이드 박스 내부에 있는지 검증
+                    var landmarksInsideGuide = false
+                    if hasLeftEye, hasRightEye, hasNose, hasMouth {
+                        let leftEyeCenter = centroid(of: leftEyePoints)
+                        let rightEyeCenter = centroid(of: rightEyePoints)
+                        let noseCenter = centroid(of: nosePoints)
+                        let mouthCenter = centroid(of: mouthPoints)
+                        landmarksInsideGuide = guideRect.contains(leftEyeCenter) &&
+                                               guideRect.contains(rightEyeCenter) &&
+                                               guideRect.contains(noseCenter) &&
+                                               guideRect.contains(mouthCenter)
+                    }
+
+                    // 가이드 영역 겹침 비율, 얼굴 크기, 랜드마크 내부 여부 모두 확인하여 유효한 얼굴인지 판단
+                    let intersection = guideRect.intersection(faceRect)
+                    let intersectionArea = intersection.width * intersection.height
+                    let faceArea = faceRect.width * faceRect.height
+                    let heightRatio = intersection.height / faceRect.height
+
+                    // 위치에 따라 다른 임계값 사용 (정면은 더 엄격, 측면은 완화)
+                    let areaThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.40 : 0.30
+                    let heightThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.45 : 0.30
+                    let isWithinGuideArea = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
+                    let isWithinGuideHeight = heightRatio > heightThreshold
+
+                    let minFaceWidth: CGFloat  = 50
+                    let minFaceHeight: CGFloat = 80
+                    let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
+
+                    let isValidFace = landmarksInsideGuide && isWithinGuideArea && isWithinGuideHeight && isFaceLargeEnough
+
+                    DispatchQueue.main.async {
+                        self.view.viewWithTag(999)?.removeFromSuperview()
+                        let debugRect = CGRect(x: guideRect.origin.x, y: guideRect.origin.y,
+                                               width: guideRect.width, height: guideRect.height)
+                        let debugView = UIView(frame: debugRect)
+                        debugView.layer.borderWidth = 2
+                        debugView.layer.borderColor = UIColor.yellow.cgColor
+                        debugView.backgroundColor = .clear
+                        debugView.tag = 999
+                        self.view.addSubview(debugView)
+
+                        self.guideOverlayView.strokeColor = isValidFace ? .green : .red
+                        self.isFaceDetected = isValidFace
+                        if isValidFace {
+                            self.currentSampleBuffer = sampleBuffer
+                        }
+                    }
+                } else {
+                    // 사이드(측면) 모드 또는 랜드마크 검출 실패 시 사각형 기반 얼굴 검출로 대체
+                    let rectRequest = VNDetectFaceRectanglesRequest { [weak self] req, err in
+                        guard let self = self else { return }
+                        guard let observations = req.results as? [VNFaceObservation],
+                              let observation = observations.first else {
+                            DispatchQueue.main.async {
+                                self.guideOverlayView.strokeColor = .red
+                                self.isFaceDetected = false
+                            }
+                            return
+                        }
+
+                        // 탐지된 boundingBox를 뷰 좌표로 변환
+                        let faceRect = VNImageRectForNormalizedRect(
+                            observation.boundingBox,
+                            Int(self.view.bounds.width),
+                            Int(self.view.bounds.height)
+                        )
+
+                        let guideRect: CGRect
+                        switch self.currentFacePosition {
+                        case .front:
+                            guideRect = CGRect(x: self.view.bounds.midX - 150,
+                                               y: self.view.bounds.midY - 140,
+                                               width: 300, height: 280)
+                        case .left:
+                            guideRect = CGRect(x: self.view.bounds.midX - 200,
+                                               y: self.view.bounds.midY - 140,
+                                               width: 310, height: 280)
+                        case .right:
+                            guideRect = CGRect(x: self.view.bounds.midX - 110,
+                                               y: self.view.bounds.midY - 140,
+                                               width: 310, height: 280)
+                        }
+
+                        // 위치에 따라 다른 임계값 사용 (정면은 더 엄격, 측면은 완화)
+                        let intersection = guideRect.intersection(faceRect)
+                        let intersectionArea = intersection.width * intersection.height
+                        let faceArea = faceRect.width * faceRect.height
+                        let heightRatio = intersection.height / faceRect.height
+
+                        let areaThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.75 : 0.45
+                        let heightThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.6 : 0.4
+                        let isWithinGuideArea = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
+                        let isWithinGuideHeight = heightRatio > heightThreshold
+
+                        let minFaceWidth: CGFloat = 85
+                        let minFaceHeight: CGFloat = 120
+                        let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
+
+                        let isValidFace = isWithinGuideArea && isWithinGuideHeight && isFaceLargeEnough
+
+                        DispatchQueue.main.async {
+                            self.view.viewWithTag(999)?.removeFromSuperview()
+                            let debugRect = CGRect(x: guideRect.origin.x, y: guideRect.origin.y,
+                                                   width: guideRect.width, height: guideRect.height)
+                            let debugView = UIView(frame: debugRect)
+                            debugView.layer.borderWidth = 2
+                            debugView.layer.borderColor = UIColor.yellow.cgColor
+                            debugView.backgroundColor = .clear
+                            debugView.tag = 999
+                            self.view.addSubview(debugView)
+
+                            self.guideOverlayView.strokeColor = isValidFace ? .green : .red
+                            self.isFaceDetected = isValidFace
+                            if isValidFace {
+                                self.currentSampleBuffer = sampleBuffer
+                            }
+                        }
+                    }
+                    try? handler.perform([rectRequest])
+                }
+            }
+            landmarksRequest.regionOfInterest = normalizedGuideRect
+            try? handler.perform([landmarksRequest])
+        } else {
+            // 사이드(측면) 모드 또는 랜드마크 검출 실패 시 사각형 기반 얼굴 검출로 대체
+            let rectRequest = VNDetectFaceRectanglesRequest { [weak self] req, err in
+                guard let self = self else { return }
+                guard let observations = req.results as? [VNFaceObservation],
+                      let observation = observations.first else {
+                    DispatchQueue.main.async {
+                        self.guideOverlayView.strokeColor = .red
+                        self.isFaceDetected = false
+                    }
+                    return
+                }
+
+                // 탐지된 boundingBox를 뷰 좌표로 변환
+                let faceRect = VNImageRectForNormalizedRect(
+                    observation.boundingBox,
+                    Int(self.view.bounds.width),
+                    Int(self.view.bounds.height)
+                )
+
+                let guideRect: CGRect
+                switch self.currentFacePosition {
+                case .front:
+                    guideRect = CGRect(x: self.view.bounds.midX - 150,
+                                       y: self.view.bounds.midY - 140,
+                                       width: 300, height: 280)
+                case .left:
+                    guideRect = CGRect(x: self.view.bounds.midX - 200,
+                                       y: self.view.bounds.midY - 140,
+                                       width: 310, height: 280)
+                case .right:
+                    guideRect = CGRect(x: self.view.bounds.midX - 110,
+                                       y: self.view.bounds.midY - 140,
+                                       width: 310, height: 280)
+                }
+
+                // 위치에 따라 다른 임계값 사용 (정면은 더 엄격, 측면은 완화)
+                let intersection = guideRect.intersection(faceRect)
+                let intersectionArea = intersection.width * intersection.height
+                let faceArea = faceRect.width * faceRect.height
+                let heightRatio = intersection.height / faceRect.height
+
+                let areaThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.75 : 0.45
+                let heightThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.6 : 0.4
+                let isWithinGuideArea = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
+                let isWithinGuideHeight = heightRatio > heightThreshold
+
+                let minFaceWidth: CGFloat = 85
+                let minFaceHeight: CGFloat = 120
+                let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
+
+                let isValidFace = isWithinGuideArea && isWithinGuideHeight && isFaceLargeEnough
+
+                DispatchQueue.main.async {
+                    self.view.viewWithTag(999)?.removeFromSuperview()
+                    let debugRect = CGRect(x: guideRect.origin.x, y: guideRect.origin.y,
+                                           width: guideRect.width, height: guideRect.height)
+                    let debugView = UIView(frame: debugRect)
+                    debugView.layer.borderWidth = 2
+                    debugView.layer.borderColor = UIColor.yellow.cgColor
+                    debugView.backgroundColor = .clear
+                    debugView.tag = 999
+                    self.view.addSubview(debugView)
+
+                    self.guideOverlayView.strokeColor = isValidFace ? .green : .red
+                    self.isFaceDetected = isValidFace
+                    if isValidFace {
+                        self.currentSampleBuffer = sampleBuffer
+                    }
+                }
+            }
+            try? handler.perform([rectRequest])
+        }
     }
 }
