@@ -11,7 +11,7 @@ import Foundation
 
 struct AccommodationRoom: Codable, Equatable {
     let id: String
-    let name: String
+    var name: String
     let description: String
     let price: Int
     let maxOccupancy: Int

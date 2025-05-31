@@ -33,6 +33,7 @@ final class RoomTableViewCell: UITableViewCell {
     func configure(with room: AccommodationRoom, hostId: String) {
         currentRoom = room
         currentHostId = hostId
+        self.nameLabel.text = room.name
         nameLabel.text = room.name
         occupancyLabel.text = "👥 최대 \(room.maxOccupancy)명"
         priceLabel.text = "🛏 \(room.price)원"
@@ -100,6 +101,7 @@ final class RoomTableViewCell: UITableViewCell {
                                         self.setBadge(text: status, color: badgeColor)
                                         self.reservationInfoLabel.isHidden = true
                                         self.nameLabel.text = "\(room.name) (\(guestName), \(checkInDateString) - \(checkOutDateString))"
+                                        self.currentRoom?.name = room.name // update currentRoom name for consistency
                                     }
                                 }
                             } else {
@@ -107,6 +109,7 @@ final class RoomTableViewCell: UITableViewCell {
                                     self.setBadge(text: status, color: badgeColor)
                                     self.reservationInfoLabel.isHidden = true
                                     self.nameLabel.text = "\(room.name) (이름없음, \(checkInDateString) - \(checkOutDateString))"
+                                    self.currentRoom?.name = room.name // update currentRoom name for consistency
                                 }
                             }
                             break
@@ -117,6 +120,7 @@ final class RoomTableViewCell: UITableViewCell {
                         await MainActor.run {
                             self.setBadge(text: "예약가능", color: .systemGreen)
                             self.reservationInfoLabel.isHidden = true
+                            self.nameLabel.text = room.name
                         }
                     }
                 }
