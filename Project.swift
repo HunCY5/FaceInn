@@ -34,6 +34,9 @@ let project = Project(
           ],
           "UIUserInterfaceStyle": "Light",
           "NSCameraUsageDescription": "얼굴 정보를 등록하려면 카메라 접근이 필요합니다.",
+          "UIRequiredDeviceCapabilities": [
+            "arkit"
+          ],
           "UIApplicationSceneManifest": [
             "UIApplicationSupportsMultipleScenes": false,
             "UISceneConfigurations": [
@@ -58,6 +61,8 @@ let project = Project(
         .package(product: "FirebaseMessaging"),
         .package(product: "FSCalendar"),
         .package(product: "Kingfisher"),
+        .sdk(name: "ARKit", type: .framework),
+        .sdk(name: "SceneKit", type: .framework),
       ],
       settings: projectSettings
     ),
