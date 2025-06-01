@@ -19,6 +19,8 @@ final class FaceCaptureViewController: UIViewController {
     weak var delegate: FaceCaptureDelegate?
     var shouldDismissToRoot: Bool = false
     var documentId: String?
+    // 카메라 원형 컨테이너 뷰 참조용 프로퍼티
+    private var cameraContainer: UIView!
     // 카메라 세션 및 출력 처리, 얼굴 임베딩 추출을 위한 관련 변수들
     private var captureSession: AVCaptureSession!
     private var videoOutput: AVCaptureVideoDataOutput!
@@ -45,6 +47,14 @@ final class FaceCaptureViewController: UIViewController {
 
     private var isFaceDetected = false
     private var currentSampleBuffer: CMSampleBuffer?
+    private var countdownTimer: Timer?
+    private var isCountingDownActive = false
+    private var countdownCount = 0
+
+    private var captureButton: UIButton!
+    private var bottomLabel: UILabel!
+    private var countdownLabel: UILabel?
+    private var instructionLabel: UILabel?
 
     // 뷰 로드 시 카메라 초기화 및 UI 요소 설정
     override func viewDidLoad() {
@@ -58,7 +68,7 @@ final class FaceCaptureViewController: UIViewController {
 
         // 원형 컨테이너 안에 카메라 미리보기
         let cameraSize: CGFloat = min(view.bounds.width, view.bounds.height) * 0.9
-        let cameraContainer = UIView(frame: CGRect(
+        cameraContainer = UIView(frame: CGRect(
             x: (view.bounds.width - cameraSize) / 2,
             y: (view.bounds.height - cameraSize) / 2,
             width: cameraSize,
@@ -73,10 +83,11 @@ final class FaceCaptureViewController: UIViewController {
 
         // 상단 안내 라벨 추가
         let topLabel = UILabel()
-        topLabel.text = "얼굴 정면을 보여주세요"
+        topLabel.text = "얼굴 정면을 가이드 프레임 안에 맞춰주세요"
         topLabel.textColor = .white
         topLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
         topLabel.translatesAutoresizingMaskIntoConstraints = false
+        topLabel.tag = 1001
         view.addSubview(topLabel)
         NSLayoutConstraint.activate([
             topLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -94,6 +105,19 @@ final class FaceCaptureViewController: UIViewController {
         cameraContainer.addSubview(guideOverlayView)
         guideOverlayView.currentPosition = currentFacePosition
         setupCaptureButton()
+
+        // 촬영 준비 안내 라벨
+        bottomLabel = UILabel()
+        bottomLabel.text = "준비가 되면 아래 버튼을 눌러 촬영을 시작하세요"
+        bottomLabel.textColor = .white
+        bottomLabel.font = UIFont.systemFont(ofSize: 15)
+        bottomLabel.textAlignment = .center
+        bottomLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(bottomLabel)
+        NSLayoutConstraint.activate([
+            bottomLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            bottomLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+        ])
     }
 
     // 촬영 화면에서는 하단 탭바 숨기기
@@ -145,24 +169,24 @@ final class FaceCaptureViewController: UIViewController {
 
     // 촬영 버튼 UI 구성 및 눌렀을 때 행동 설정
     private func setupCaptureButton() {
-        let button = UIButton(type: .system)
-        button.setTitle("촬영시작", for: .normal)
-        button.setTitleColor(.white, for: .normal)
-        button.backgroundColor = UIColor.systemGreen
-        button.layer.cornerRadius = 30
-        button.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(button)
+        captureButton = UIButton(type: .system)
+        captureButton.setTitle("촬영시작", for: .normal)
+        captureButton.setTitleColor(.white, for: .normal)
+        captureButton.backgroundColor = UIColor.systemGreen
+        captureButton.layer.cornerRadius = 30
+        captureButton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(captureButton)
 
         NSLayoutConstraint.activate([
-            button.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            button.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -40),
-            button.widthAnchor.constraint(equalToConstant: 60),
-            button.heightAnchor.constraint(equalToConstant: 60)
+            captureButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            captureButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -40),
+            captureButton.widthAnchor.constraint(equalToConstant: 60),
+            captureButton.heightAnchor.constraint(equalToConstant: 60)
         ])
 
-        button.addTarget(self, action: #selector(handleManualCapture), for: .touchUpInside)
+        captureButton.addTarget(self, action: #selector(handleManualCapture), for: .touchUpInside)
 
-        setupSwitchCameraButton(captureButton: button)
+        setupSwitchCameraButton(captureButton: captureButton)
     }
 
     @objc private func toggleCamera() {
@@ -253,8 +277,9 @@ final class FaceCaptureViewController: UIViewController {
         }
     }
 
-    // 촬영 버튼 눌렀을 때 현재 얼굴이 감지되었는지 확인 후 이미지 저장
+    // 촬영 버튼 눌렀을 때 얼굴 인식 여부 확인 후 카운트다운 모드 진입
     @objc private func handleManualCapture() {
+        // 얼굴이 인식되지 않은 경우 알림 후 종료
         if !isFaceDetected {
             let alert = UIAlertController(title: "얼굴 인식 필요", message: "프레임에 얼굴을 맞춰주세요.", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "확인", style: .default))
@@ -262,6 +287,104 @@ final class FaceCaptureViewController: UIViewController {
             return
         }
 
+        // 얼굴이 인식된 상태에서 버튼 누르면 카운트다운 모드 활성
+        isCountingDownActive = true
+        // 상단 안내 문구(얼굴 정면을 가이드 프레임 안에 맞춰주세요) 숨기기
+        view.viewWithTag(1001)?.removeFromSuperview()
+
+        // 버튼 및 하단 안내 라벨 숨기기
+        captureButton.isHidden = true
+        switchCameraButton.isHidden = true
+        bottomLabel.isHidden = true
+
+        // 상단 카운트다운 라벨 생성
+        countdownLabel = UILabel()
+        countdownLabel?.textColor = .white
+        countdownLabel?.font = UIFont.systemFont(ofSize: 60, weight: .bold)
+        countdownLabel?.textAlignment = .center
+        countdownLabel?.translatesAutoresizingMaskIntoConstraints = false
+        if let countdownLabel = countdownLabel {
+            view.addSubview(countdownLabel)
+            NSLayoutConstraint.activate([
+                // 카운트다운 숫자를 카메라 컨테이너 바로 위에 위치시키기
+                countdownLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                countdownLabel.bottomAnchor.constraint(equalTo: cameraContainer.topAnchor, constant: -16)
+            ])
+        }
+
+        // 하단 촬영 안내 라벨 생성 (초기 안내 문구)
+        instructionLabel = UILabel()
+        instructionLabel?.text = "얼굴이 가이드 프레임 안에 들어오면 자동으로 촬영됩니다"
+        instructionLabel?.textColor = .white
+        instructionLabel?.font = UIFont.systemFont(ofSize: 15)
+        instructionLabel?.textAlignment = .center
+        instructionLabel?.translatesAutoresizingMaskIntoConstraints = false
+        if let instructionLabel = instructionLabel {
+            view.addSubview(instructionLabel)
+            NSLayoutConstraint.activate([
+                instructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                instructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+            ])
+        }
+
+        // 3초 카운트다운 시작
+        startCountdown()
+    }
+
+    // 카운트다운 시작
+    private func startCountdown() {
+        countdownCount = 3
+        countdownLabel?.text = "\(countdownCount)"
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+            guard let self = self else { return }
+            self.countdownCount -= 1
+            if self.countdownCount > 0 {
+                self.countdownLabel?.text = "\(self.countdownCount)"
+            } else {
+                timer.invalidate()
+                self.countdownTimer = nil
+                // 카운트다운 완료 후 사진 촬영
+                self.countdownLabel?.removeFromSuperview()
+                self.instructionLabel?.removeFromSuperview()
+                self.countdownLabel = nil
+                self.instructionLabel = nil
+                self.isCountingDownActive = false
+                self.capturePhoto()
+            }
+        }
+    }
+
+    // 카운트다운 리셋 (중단 및 재설정)
+    private func resetCountdown() {
+        // 타이머 중단
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        // 카운트다운 숫자를 "3"으로 고정
+        countdownCount = 3
+        countdownLabel?.text = "\(countdownCount)"
+        // 기존 안내 라벨 제거
+        instructionLabel?.removeFromSuperview()
+        instructionLabel = nil
+        // 카운트다운 모드는 여전히 활성 상태로 유지
+        isCountingDownActive = true
+        // 안내 라벨: 얼굴을 가이드 프레임 안에 맞춰달라는 문구
+        instructionLabel = UILabel()
+        instructionLabel?.text = "얼굴 정면을 가이드 프레임 안에 맞춰주세요"
+        instructionLabel?.textColor = .white
+        instructionLabel?.font = UIFont.systemFont(ofSize: 15)
+        instructionLabel?.textAlignment = .center
+        instructionLabel?.translatesAutoresizingMaskIntoConstraints = false
+        if let instructionLabel = instructionLabel {
+            view.addSubview(instructionLabel)
+            NSLayoutConstraint.activate([
+                instructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                instructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+            ])
+        }
+    }
+
+    // 카운트다운 후 사진 촬영 및 저장
+    private func capturePhoto() {
         guard let sampleBuffer = currentSampleBuffer,
               let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
@@ -415,6 +538,34 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
 
                         self.guideOverlayView.strokeColor = isValidFace ? .green : .red
                         self.isFaceDetected = isValidFace
+                        // 카운트다운 활성 상태에서 얼굴 인식 변화 처리
+                        if self.isCountingDownActive {
+                            if self.isFaceDetected {
+                                // 얼굴이 인식되고 카운트다운이 진행 중이지 않다면 안내 문구 변경 후 카운트다운 시작
+                                if self.countdownTimer == nil {
+                                    self.instructionLabel?.removeFromSuperview()
+                                    self.instructionLabel = UILabel()
+                                    self.instructionLabel?.text = "3초 후 자동으로 촬영됩니다"
+                                    self.instructionLabel?.textColor = .white
+                                    self.instructionLabel?.font = UIFont.systemFont(ofSize: 15)
+                                    self.instructionLabel?.textAlignment = .center
+                                    self.instructionLabel?.translatesAutoresizingMaskIntoConstraints = false
+                                    if let instructionLabel = self.instructionLabel {
+                                        self.view.addSubview(instructionLabel)
+                                        NSLayoutConstraint.activate([
+                                            instructionLabel.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
+                                            instructionLabel.bottomAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+                                        ])
+                                    }
+                                    self.startCountdown()
+                                }
+                            } else {
+                                // 얼굴이 인식되지 않으면 카운트다운 중단 및 리셋
+                                if self.countdownTimer != nil {
+                                    self.resetCountdown()
+                                }
+                            }
+                        }
                         if isValidFace {
                             self.currentSampleBuffer = sampleBuffer
                         }
@@ -426,8 +577,35 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
                         guard let observations = req.results as? [VNFaceObservation],
                               let observation = observations.first else {
                             DispatchQueue.main.async {
-                                self.guideOverlayView.strokeColor = .red
-                                self.isFaceDetected = false
+                            self.guideOverlayView.strokeColor = .red
+                            self.isFaceDetected = false
+                            // 카운트다운 활성 상태에서 얼굴 인식 변화 처리
+                            if self.isCountingDownActive {
+                                if self.isFaceDetected {
+                                    // 얼굴이 인식되고 카운트다운이 진행 중이지 않다면 안내 문구 변경 후 카운트다운 시작
+                                    if self.countdownTimer == nil {
+                                        self.instructionLabel?.removeFromSuperview()
+                                        self.instructionLabel = UILabel()
+                                        self.instructionLabel?.text = "얼굴이 가이드 프레임 안에 들어오면 자동으로 촬영됩니다"
+                                        self.instructionLabel?.textColor = .white
+                                        self.instructionLabel?.font = UIFont.systemFont(ofSize: 15)
+                                        self.instructionLabel?.textAlignment = .center
+                                        self.instructionLabel?.translatesAutoresizingMaskIntoConstraints = false
+                                        if let instructionLabel = self.instructionLabel {
+                                            self.view.addSubview(instructionLabel)
+                                            NSLayoutConstraint.activate([
+                                                instructionLabel.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
+                                                instructionLabel.bottomAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+                                            ])
+                                        }
+                                        self.startCountdown()
+                                    }
+                                } else {
+                                    if self.countdownTimer != nil {
+                                        self.resetCountdown()
+                                    }
+                                }
+                            }
                             }
                             return
                         }
@@ -485,6 +663,18 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
 
                             self.guideOverlayView.strokeColor = isValidFace ? .green : .red
                             self.isFaceDetected = isValidFace
+                            // 카운트다운 활성 상태에서 얼굴 인식 변화 처리
+                            if self.isCountingDownActive {
+                                if self.isFaceDetected {
+                                    if self.countdownTimer == nil {
+                                        self.startCountdown()
+                                    }
+                                } else {
+                                    if self.countdownTimer != nil {
+                                        self.resetCountdown()
+                                    }
+                                }
+                            }
                             if isValidFace {
                                 self.currentSampleBuffer = sampleBuffer
                             }
@@ -504,6 +694,33 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
                     DispatchQueue.main.async {
                         self.guideOverlayView.strokeColor = .red
                         self.isFaceDetected = false
+                        // 카운트다운 활성 상태에서 얼굴 인식 변화 처리
+                        if self.isCountingDownActive {
+                            if self.isFaceDetected {
+                                // 얼굴이 인식되고 카운트다운이 진행 중이지 않다면 안내 문구 변경 후 카운트다운 시작
+                                if self.countdownTimer == nil {
+                                    self.instructionLabel?.removeFromSuperview()
+                                    self.instructionLabel = UILabel()
+                                    self.instructionLabel?.text = "얼굴이 가이드 프레임 안에 들어오면 자동으로 촬영됩니다"
+                                    self.instructionLabel?.textColor = .white
+                                    self.instructionLabel?.font = UIFont.systemFont(ofSize: 15)
+                                    self.instructionLabel?.textAlignment = .center
+                                    self.instructionLabel?.translatesAutoresizingMaskIntoConstraints = false
+                                    if let instructionLabel = self.instructionLabel {
+                                        self.view.addSubview(instructionLabel)
+                                        NSLayoutConstraint.activate([
+                                            instructionLabel.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
+                                            instructionLabel.bottomAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+                                        ])
+                                    }
+                                    self.startCountdown()
+                                }
+                            } else {
+                                if self.countdownTimer != nil {
+                                    self.resetCountdown()
+                                }
+                            }
+                        }
                     }
                     return
                 }
