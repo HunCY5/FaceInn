@@ -208,7 +208,7 @@ final class RoomTableViewCell: UITableViewCell {
         editButton.titleLabel?.font = UIFont.systemFont(ofSize: 14)
         editButton.addTarget(self, action: #selector(editButtonTapped), for: .touchUpInside)
 
-        nameLabel.font = UIFont.boldSystemFont(ofSize: 16)
+        nameLabel.font = UIFont.boldSystemFont(ofSize: 15)
 
         occupancyLabel.font = UIFont.systemFont(ofSize: 13)
         priceLabel.font = UIFont.systemFont(ofSize: 13)
