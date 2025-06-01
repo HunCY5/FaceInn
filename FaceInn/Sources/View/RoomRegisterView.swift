@@ -1,13 +1,14 @@
 //
-//  AccommodationRegisterView.swift
+//  RoomRegisterView.swift
 //  FaceInn
 //
-//  Created by 신찬솔 on 5/30/25.
+//  Created by 신찬솔 on 5/31/25.
 //
+
 
 import UIKit
 
-extension AccommodationRegisterView {
+extension RoomRegisterView {
     func showLoading() {
         let loadingView = UIActivityIndicatorView(style: .large)
         loadingView.center = self.center
@@ -27,7 +28,7 @@ extension AccommodationRegisterView {
     }
 }
 
-final class AccommodationRegisterView: UIView {
+final class RoomRegisterView: UIView {
 
     private let loadingView: UIActivityIndicatorView = {
         let indicator = UIActivityIndicatorView(style: .large)
@@ -82,14 +83,14 @@ final class AccommodationRegisterView: UIView {
 
     public let nameLabel: UILabel = {
         let label = UILabel()
-        label.text = "숙소명"
+        label.text = "객실 이름"
         label.font = .systemFont(ofSize: 14, weight: .medium)
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
     public let nameTextField: UITextField = {
         let tf = UITextField()
-        tf.placeholder = "숙소명을 입력하세요"
+        tf.placeholder = "객실 이름을 입력하세요"
         tf.borderStyle = .roundedRect
         tf.font = .systemFont(ofSize: 14, weight: .medium)
         tf.translatesAutoresizingMaskIntoConstraints = false
@@ -98,15 +99,16 @@ final class AccommodationRegisterView: UIView {
 
     public let addressLabel: UILabel = {
         let label = UILabel()
-        label.text = "주소"
+        label.text = "가격"
         label.font = .systemFont(ofSize: 14, weight: .medium)
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
     public let addressTextField: UITextField = {
         let tf = UITextField()
-        tf.placeholder = "주소를 입력하세요"
+        tf.placeholder = "가격을 입력하세요"
         tf.borderStyle = .roundedRect
+        tf.keyboardType = .numberPad
         tf.font = .systemFont(ofSize: 14, weight: .medium)
         tf.translatesAutoresizingMaskIntoConstraints = false
         return tf
@@ -114,18 +116,71 @@ final class AccommodationRegisterView: UIView {
 
     public let descriptionLabel: UILabel = {
         let label = UILabel()
-        label.text = "숙소 설명"
+        label.text = "객실 설명"
         label.font = .systemFont(ofSize: 14, weight: .medium)
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
     public let descriptionTextField: UITextField = {
         let tf = UITextField()
-        tf.placeholder = "숙소 설명을 입력하세요"
+        tf.placeholder = "객실 설명을 입력하세요"
         tf.borderStyle = .roundedRect
         tf.font = .systemFont(ofSize: 14, weight: .medium)
         tf.translatesAutoresizingMaskIntoConstraints = false
         return tf
+    }()
+
+    public let capacityLabel: UILabel = {
+        let label = UILabel()
+        label.text = "최대 인원"
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    public let capacityTextField: UITextField = {
+        let tf = UITextField()
+        tf.placeholder = "최대 인원을 입력하세요"
+        tf.borderStyle = .roundedRect
+        tf.keyboardType = .numberPad
+        tf.font = .systemFont(ofSize: 14, weight: .medium)
+        tf.translatesAutoresizingMaskIntoConstraints = false
+        return tf
+    }()
+
+    public let checkInLabel: UILabel = {
+        let label = UILabel()
+        label.text = "체크인 시간"
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    public let checkInPicker: UIDatePicker = {
+        let picker = UIDatePicker()
+        picker.datePickerMode = .time
+        picker.preferredDatePickerStyle = .wheels
+        picker.locale = Locale(identifier: "ko_KR")
+        let checkInDate = Calendar.current.date(bySettingHour: 15, minute: 0, second: 0, of: Date()) ?? Date()
+        picker.date = checkInDate
+        picker.translatesAutoresizingMaskIntoConstraints = false
+        return picker
+    }()
+
+    public let checkOutLabel: UILabel = {
+        let label = UILabel()
+        label.text = "체크아웃 시간"
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    public let checkOutPicker: UIDatePicker = {
+        let picker = UIDatePicker()
+        picker.datePickerMode = .time
+        picker.preferredDatePickerStyle = .wheels
+        picker.locale = Locale(identifier: "ko_KR")
+        let checkOutDate = Calendar.current.date(bySettingHour: 11, minute: 0, second: 0, of: Date()) ?? Date()
+        picker.date = checkOutDate
+        picker.translatesAutoresizingMaskIntoConstraints = false
+        return picker
     }()
 
     public let amenitiesLabel: UILabel = {
@@ -180,12 +235,22 @@ final class AccommodationRegisterView: UIView {
     private func setupViews() {
         backgroundColor = .white
 
-        addSubview(scrollView)
+        // Enable vertical scrolling and proper content sizing
         scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.addSubview(contentView)
+        scrollView.alwaysBounceVertical = true
+        scrollView.showsVerticalScrollIndicator = true
+        addSubview(scrollView)
         contentView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(contentView)
 
-        let amenities = ["Wi-Fi", "수영장", "피트니스", "무료 주차", "레스토랑", "룸서비스", "에어컨", "난방", "세탁기", "건조기", "엘리베이터", "반려동물 가능", "조식 제공", "바다 전망", "테라스"]
+        let amenities = [
+            "Wi-Fi", "에어컨", "난방", "엘리베이터", "무료 주차",
+            "조식 제공", "레스토랑", "룸서비스",
+            "세탁기", "건조기", "욕조", "헤어드라이어",
+            "수영장", "피트니스",
+            "반려동물 가능",
+            "바다 전망", "테라스", "발코니"
+        ]
         let buttonsPerRow = 3
         for rowIndex in 0 ..< ((amenities.count + buttonsPerRow - 1) / buttonsPerRow) {
             let rowStack = UIStackView()
@@ -227,6 +292,12 @@ final class AccommodationRegisterView: UIView {
             nameTextField,
             addressLabel,
             addressTextField,
+            capacityLabel,
+            capacityTextField,
+            checkInLabel,
+            checkInPicker,
+            checkOutLabel,
+            checkOutPicker,
             descriptionLabel,
             descriptionTextField,
             amenitiesLabel,
@@ -247,8 +318,6 @@ final class AccommodationRegisterView: UIView {
             button.translatesAutoresizingMaskIntoConstraints = false
             return button
         }()
-        self.logoutButton = logoutButton
-        contentView.addSubview(logoutButton)
         // Add loadingView
         addSubview(loadingView)
         NSLayoutConstraint.activate([
@@ -271,6 +340,8 @@ final class AccommodationRegisterView: UIView {
             contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            // contentView.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.heightAnchor), // Removed for dynamic sizing
+            contentView.bottomAnchor.constraint(equalTo: registerButton.bottomAnchor, constant: 24),
 
             collectionView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
             collectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
@@ -301,7 +372,29 @@ final class AccommodationRegisterView: UIView {
             addressTextField.trailingAnchor.constraint(equalTo: nameTextField.trailingAnchor),
             addressTextField.heightAnchor.constraint(equalToConstant: 40),
 
-            descriptionLabel.topAnchor.constraint(equalTo: addressTextField.bottomAnchor, constant: 16),
+            capacityLabel.topAnchor.constraint(equalTo: addressTextField.bottomAnchor, constant: 16),
+            capacityLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+
+            capacityTextField.topAnchor.constraint(equalTo: capacityLabel.bottomAnchor, constant: 4),
+            capacityTextField.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+            capacityTextField.trailingAnchor.constraint(equalTo: nameTextField.trailingAnchor),
+            capacityTextField.heightAnchor.constraint(equalToConstant: 40),
+
+            checkInLabel.topAnchor.constraint(equalTo: capacityTextField.bottomAnchor, constant: 16),
+            checkInLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+
+            checkInPicker.topAnchor.constraint(equalTo: checkInLabel.bottomAnchor, constant: 4),
+            checkInPicker.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+            checkInPicker.trailingAnchor.constraint(equalTo: nameTextField.trailingAnchor),
+
+            checkOutLabel.topAnchor.constraint(equalTo: checkInPicker.bottomAnchor, constant: 16),
+            checkOutLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+
+            checkOutPicker.topAnchor.constraint(equalTo: checkOutLabel.bottomAnchor, constant: 4),
+            checkOutPicker.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+            checkOutPicker.trailingAnchor.constraint(equalTo: nameTextField.trailingAnchor),
+
+            descriptionLabel.topAnchor.constraint(equalTo: checkOutPicker.bottomAnchor, constant: 16),
             descriptionLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
 
             descriptionTextField.topAnchor.constraint(equalTo: descriptionLabel.bottomAnchor, constant: 4),
@@ -321,14 +414,9 @@ final class AccommodationRegisterView: UIView {
             registerButton.trailingAnchor.constraint(equalTo: nameTextField.trailingAnchor),
             registerButton.heightAnchor.constraint(equalToConstant: 50)
         ])
-        NSLayoutConstraint.activate([
-            logoutButton.topAnchor.constraint(equalTo: registerButton.bottomAnchor, constant: 12),
-            logoutButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            logoutButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -32)
-        ])
     }
 
-    @objc private func toggleAmenity(_ sender: UIButton) {
+    @objc func toggleAmenity(_ sender: UIButton) {
         if sender.backgroundColor == UIColor.white {
             sender.backgroundColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1)
             sender.setTitleColor(.white, for: .normal)
@@ -337,6 +425,14 @@ final class AccommodationRegisterView: UIView {
             sender.backgroundColor = .white
             sender.setTitleColor(.black, for: .normal)
             sender.layer.borderColor = UIColor.lightGray.cgColor
+        }
+        // Update selectedAmenities based on button title and selection state
+        if let title = sender.title(for: .normal) {
+            if selectedAmenities.contains(title) {
+                selectedAmenities.remove(title)
+            } else {
+                selectedAmenities.insert(title)
+            }
         }
         amenityButtonHandler?(sender)
     }
@@ -402,12 +498,5 @@ final class AccommodationRegisterView: UIView {
         }
         selectedImages.append(contentsOf: newImages)
     }
-    public var logoutButton: UIButton!
-
-    public var amenityButtons: [UIButton] {
-        return amenitiesStackView.arrangedSubviews
-            .compactMap { $0 as? UIStackView }
-            .flatMap { $0.arrangedSubviews }
-            .compactMap { $0 as? UIButton }
-    }
+    
 }
