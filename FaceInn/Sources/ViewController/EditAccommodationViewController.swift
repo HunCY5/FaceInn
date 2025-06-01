@@ -24,6 +24,14 @@ class EditAccommodationViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         self.title = "숙소 수정"
+        let backButton = UIButton(type: .system)
+        backButton.setImage(UIImage(systemName: "chevron.left"), for: .normal)
+        backButton.setTitle(" ", for: .normal) // 아이콘만 표시
+        backButton.tintColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1.0) // #2faf53
+        backButton.addTarget(self, action: #selector(self.handleBackButtonTapped), for: .touchUpInside)
+        backButton.sizeToFit()
+        let barButtonItem = UIBarButtonItem(customView: backButton)
+        navigationItem.leftBarButtonItem = barButtonItem
         editView.logoutButton.isHidden = true
         // Fetch accommodation data for current user before setting up view actions
         if let userId = Auth.auth().currentUser?.uid {
@@ -77,6 +85,7 @@ class EditAccommodationViewController: UIViewController {
         editView.collectionView.dataSource = self
         editView.collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "Cell")
         editView.selectImageButton.addTarget(self, action: #selector(selectImageTapped), for: .touchUpInside)
+        editView.registerButton.backgroundColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1.0)
         editView.registerButton.addTarget(self, action: #selector(registerAccommodation), for: .touchUpInside)
 
         editView.amenityButtonHandler = { [weak self] sender in
@@ -232,6 +241,64 @@ class EditAccommodationViewController: UIViewController {
         editView.selectedImages.remove(at: index)
         editView.collectionView.reloadData()
         editView.photoCountLabel.text = "\(editView.selectedImages.count) / 10"
+    }
+
+    // 사용자 정의 뒤로가기 버튼 액션
+    @objc private func handleBackButtonTapped() {
+        hasUnsavedChanges { [weak self] changed in
+            guard let self = self else { return }
+            if changed {
+                let alert = UIAlertController(title: "알림", message: "변경사항이 있습니다. 뒤로 가시겠습니까?", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "취소", style: .cancel, handler: nil))
+                alert.addAction(UIAlertAction(title: "확인", style: .default, handler: { _ in
+                    self.navigationController?.popViewController(animated: true)
+                }))
+                self.present(alert, animated: true)
+            } else {
+                self.navigationController?.popViewController(animated: true)
+            }
+        }
+    }
+
+    // 변경 여부 판단 (비동기)
+    private func hasUnsavedChanges(completion: @escaping (Bool) -> Void) {
+        guard let name = editView.nameTextField.text,
+              let address = editView.addressTextField.text,
+              let description = editView.descriptionTextField.text else {
+            completion(false)
+            return
+        }
+        guard let userId = Auth.auth().currentUser?.uid else {
+            completion(false)
+            return
+        }
+        let userRef = Firestore.firestore().collection("users").document(userId)
+        userRef.getDocument { [weak self] snapshot, error in
+            guard let self = self else { completion(false); return }
+            if let data = snapshot?.data(), let accommodationId = data["accommodationId"] as? String {
+                let accommodationRef = Firestore.firestore().collection("accommodations").document(accommodationId)
+                accommodationRef.getDocument { docSnapshot, _ in
+                    if let docData = docSnapshot?.data() {
+                        let originalName = docData["name"] as? String ?? ""
+                        let originalAddress = docData["location"] as? String ?? ""
+                        let originalDescription = docData["description"] as? String ?? ""
+                        let originalAmenities = (docData["amenities"] as? [String]) ?? []
+                        let originalImageURLs = (docData["imageURLs"] as? [String]) ?? []
+
+                        let changed = originalName != name ||
+                                      originalAddress != address ||
+                                      originalDescription != description ||
+                                      Set(originalAmenities) != self.editView.selectedAmenities ||
+                                      originalImageURLs.count != self.editView.selectedImages.count
+                        completion(changed)
+                    } else {
+                        completion(false)
+                    }
+                }
+            } else {
+                completion(false)
+            }
+        }
     }
 }
 

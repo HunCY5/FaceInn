@@ -25,6 +25,16 @@ final class EditRoomViewController: UIViewController, UICollectionViewDataSource
 
     override func viewDidLoad() {
         self.title = "객실 정보 수정"
+        // Custom back button
+        let backButton = UIButton(type: .system)
+        backButton.setImage(UIImage(systemName: "chevron.left"), for: .normal)
+        backButton.setTitle(" ", for: .normal)
+        backButton.tintColor = UIColor(red: 47/255, green: 175/255, blue: 83/255, alpha: 1.0) // #2faf53
+        backButton.addTarget(self, action: #selector(self.handleBackButtonTapped), for: .touchUpInside)
+        backButton.sizeToFit()
+        let barButtonItem = UIBarButtonItem(customView: backButton)
+        navigationItem.leftBarButtonItem = barButtonItem
+
         super.viewDidLoad()
         editRoomView.collectionView.dataSource = self
         editRoomView.collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "Cell")
@@ -308,6 +318,83 @@ final class EditRoomViewController: UIViewController, UICollectionViewDataSource
         picker.delegate = self
         present(picker, animated: true)
     }
+    // MARK: - Custom Back Button Handler
+    @objc private func handleBackButtonTapped() {
+        hasUnsavedChanges { [weak self] changed in
+            guard let self = self else { return }
+            if changed {
+                let alert = UIAlertController(title: "알림", message: "변경사항이 있습니다. 뒤로 가시겠습니까?", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "취소", style: .cancel, handler: nil))
+                alert.addAction(UIAlertAction(title: "확인", style: .default, handler: { _ in
+                    self.navigationController?.popViewController(animated: true)
+                }))
+                self.present(alert, animated: true)
+            } else {
+                self.navigationController?.popViewController(animated: true)
+            }
+        }
+    }
+
+    private func hasUnsavedChanges(completion: @escaping (Bool) -> Void) {
+        guard let name = editRoomView.nameTextField.text,
+              let address = editRoomView.addressTextField.text,
+              let description = editRoomView.descriptionTextField.text else {
+            completion(false)
+            return
+        }
+        guard let userId = Auth.auth().currentUser?.uid,
+              let roomId = self.roomId else {
+            completion(false)
+            return
+        }
+        let userRef = Firestore.firestore().collection("users").document(userId)
+        userRef.getDocument { [weak self] snapshot, error in
+            guard let self = self else { completion(false); return }
+            if let data = snapshot?.data(), let accommodationId = data["accommodationId"] as? String {
+                let accommodationRef = Firestore.firestore().collection("accommodations").document(accommodationId)
+                accommodationRef.getDocument { docSnapshot, _ in
+                    if let docData = docSnapshot?.data(), let rooms = docData["rooms"] as? [[String: Any]],
+                       let originalRoom = rooms.first(where: { $0["id"] as? String == roomId }) {
+
+                        let originalName = originalRoom["name"] as? String ?? ""
+                        let originalAddress = "\(originalRoom["price"] ?? "")"
+                        let originalDescription = originalRoom["description"] as? String ?? ""
+                        let originalAmenities = (originalRoom["amenities"] as? [String]) ?? []
+                        let originalImageURLs = (originalRoom["imageURLs"] as? [String]) ?? []
+                        let originalCheckInTime = originalRoom["checkInTime"] as? String ?? ""
+                        let originalCheckOutTime = originalRoom["checkOutTime"] as? String ?? ""
+                        let currentCheckInTime = self.formatTime(self.editRoomView.checkInPicker.date)
+                        let currentCheckOutTime = self.formatTime(self.editRoomView.checkOutPicker.date)
+
+                        let changed = originalName != name ||
+                                      originalAddress != address ||
+                                      originalDescription != description ||
+                                      Set(originalAmenities) != self.editRoomView.selectedAmenities ||
+                                      originalImageURLs.count != self.editRoomView.selectedImages.count ||
+                                      originalCheckInTime != currentCheckInTime ||
+                                      originalCheckOutTime != currentCheckOutTime
+                        completion(changed)
+                    } else {
+                        completion(false)
+                    }
+                }
+            } else {
+                completion(false)
+            }
+        }
+    }
+    // MARK: - Helper Methods
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        self.present(alert, animated: true)
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
 }
 
 extension EditRoomViewController: PHPickerViewControllerDelegate {
@@ -335,30 +422,3 @@ extension EditRoomViewController: PHPickerViewControllerDelegate {
         }
     }
 }
-
-
-
-extension EditRoomViewController {
-    // MARK: - Helper
-    private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
-    }
-}
-
-// MARK: - Alert Helper
-private extension EditRoomViewController {
-    func showAlert(title: String, message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "확인", style: .default))
-        present(alert, animated: true)
-    }
-}
-
-
-    // Helper property for image URLs (customize as needed)
-    private var imageURLs: [String] {
-        // You can customize this logic if you're storing new image uploads
-        return [] // Placeholder: integrate with your actual upload logic if applicable
-    }
