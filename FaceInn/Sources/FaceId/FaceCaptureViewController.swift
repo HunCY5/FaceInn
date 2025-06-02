@@ -142,17 +142,19 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
     private func setupCaptureButton() {
         captureButton = UIButton(type: .system)
         captureButton.setTitle("촬영시작", for: .normal)
+        captureButton.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
         captureButton.setTitleColor(.white, for: .normal)
         captureButton.backgroundColor = UIColor.systemGreen
-        captureButton.layer.cornerRadius = 30
+        captureButton.layer.cornerRadius = 10
+        captureButton.clipsToBounds = true
         captureButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(captureButton)
 
         NSLayoutConstraint.activate([
             captureButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             captureButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -40),
-            captureButton.widthAnchor.constraint(equalToConstant: 60),
-            captureButton.heightAnchor.constraint(equalToConstant: 60)
+            captureButton.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.8),
+            captureButton.heightAnchor.constraint(equalToConstant: 50)
         ])
 
         captureButton.addTarget(self, action: #selector(handleManualCapture), for: .touchUpInside)
@@ -1162,13 +1164,42 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                     // 카운트다운 활성 상태에서 얼굴 인식 변화 처리
                     if self.isCountingDownActive {
                         if self.isFaceDetected {
+                            // 얼굴 인식 재개 시 안내문구 및 카운트다운 재개
+                            if let label = self.instructionLabel, label.superview != nil {
+                                label.text = "3초 후 자동으로 촬영됩니다"
+                            } else {
+                                let newInstructionLabel = UILabel()
+                                newInstructionLabel.text = "3초 후 자동으로 촬영됩니다"
+                                newInstructionLabel.textColor = .white
+                                newInstructionLabel.font = UIFont.systemFont(ofSize: 15)
+                                newInstructionLabel.textAlignment = .center
+                                newInstructionLabel.translatesAutoresizingMaskIntoConstraints = false
+                                self.instructionLabel = newInstructionLabel
+                                self.view.addSubview(newInstructionLabel)
+                                NSLayoutConstraint.activate([
+                                    newInstructionLabel.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
+                                    newInstructionLabel.bottomAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+                                ])
+                            }
                             if self.countdownTimer == nil {
                                 self.startCountdown()
                             }
                         } else {
-                            if self.countdownTimer != nil {
-                                self.resetCountdown()
-                            }
+                            // 얼굴 인식 중단 시 안내문구 복원
+                            self.resetCountdown()
+                            self.instructionLabel?.removeFromSuperview()
+                            let newInstructionLabel = UILabel()
+                            newInstructionLabel.text = "얼굴 정면을 가이드 프레임 안에 맞춰주세요"
+                            newInstructionLabel.textColor = .white
+                            newInstructionLabel.font = UIFont.systemFont(ofSize: 15)
+                            newInstructionLabel.textAlignment = .center
+                            newInstructionLabel.translatesAutoresizingMaskIntoConstraints = false
+                            self.instructionLabel = newInstructionLabel
+                            self.view.addSubview(newInstructionLabel)
+                            NSLayoutConstraint.activate([
+                                newInstructionLabel.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
+                                newInstructionLabel.bottomAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+                            ])
                         }
                     }
                 }

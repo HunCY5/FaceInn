@@ -127,13 +127,15 @@ final class GuestCameraViewController: UIViewController {
     
     // MARK: - Button Actions
     @objc private func didTapCheckin() {
-        // TODO: 카메라 얼굴 인식 로직
-        print("체크인 시작 버튼 tapped")
+        let faceVC = GuestFaceRecognitionViewController()
+        faceVC.recognitionType = .checkIn
+        navigationController?.pushViewController(faceVC, animated: true)
     }
     
     @objc private func didTapCheckout() {
-        // TODO: 카메라 얼굴 인식 로직
-        print("체크아웃 시작 버튼 tapped")
+        let faceVC = GuestFaceRecognitionViewController()
+        faceVC.recognitionType = .checkOut
+        navigationController?.pushViewController(faceVC, animated: true)
     }
     
     @objc private func onFaceInnTapped() {
