@@ -9,44 +9,31 @@
 // 사용 기술: AVFoundation
 
 import UIKit
-import AVFoundation
+import ARKit
+import SceneKit
 import Vision
 import FirebaseFirestore
 import FirebaseAuth
 
 
-final class FaceCaptureViewController: UIViewController {
+final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
     weak var delegate: FaceCaptureDelegate?
     var shouldDismissToRoot: Bool = false
     var documentId: String?
     // 카메라 원형 컨테이너 뷰 참조용 프로퍼티
     private var cameraContainer: UIView!
-    // 카메라 세션 및 출력 처리, 얼굴 임베딩 추출을 위한 관련 변수들
-    private var captureSession: AVCaptureSession!
-    private var videoOutput: AVCaptureVideoDataOutput!
-    private var previewLayer: AVCaptureVideoPreviewLayer!
-    private var captureQueue = DispatchQueue(label: "captureQueue")
+    // ARKit 얼굴 트래킹 뷰
+    private var arView: ARSCNView!
     private var processor = FaceProcessor()
 
     private var isUsingFrontCamera = false
     private var isCapturing = false
-    private let switchCameraButton: UIButton = {
-        let button = UIButton(type: .system)
-        let image = UIImage(systemName: "arrow.triangle.2.circlepath.camera")
-        button.setImage(image, for: .normal)
-        button.tintColor = .white
-        button.backgroundColor = UIColor.black.withAlphaComponent(0.5)
-        button.layer.cornerRadius = 25
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
 
     private var currentFacePosition: FaceGuideOverlayView.FacePosition = .front
     private var faceImages: [FaceGuideOverlayView.FacePosition: UIImage] = [:]
     private let guideOverlayView = FaceGuideOverlayView()
 
     private var isFaceDetected = false
-    private var currentSampleBuffer: CMSampleBuffer?
     private var countdownTimer: Timer?
     private var isCountingDownActive = false
     private var countdownCount = 0
@@ -55,6 +42,16 @@ final class FaceCaptureViewController: UIViewController {
     private var bottomLabel: UILabel!
     private var countdownLabel: UILabel?
     private var instructionLabel: UILabel?
+
+    // 왼쪽 측면 안내 시각화 레이어 및 목표 요(yaw) 임계값
+    private var currentYawLayer: CAShapeLayer?
+    private var targetYawLayer: CAShapeLayer?
+    private let leftTargetYaw: Float = -22 * Float.pi / 180  // 약 −22°
+    private let yawThreshold: Float = 0.1       // 목표 요(yaw) 주변 허용 오차
+    private var leftTargetX: CGFloat?
+
+    // 디버깅용 가이드 사각형 레이어 (개발용)
+    private var debugGuideLayer: CAShapeLayer?
 
     // 뷰 로드 시 카메라 초기화 및 UI 요소 설정
     override func viewDidLoad() {
@@ -94,10 +91,15 @@ final class FaceCaptureViewController: UIViewController {
             topLabel.bottomAnchor.constraint(equalTo: cameraContainer.topAnchor, constant: -16)
         ])
 
-        // 컨테이너 뷰 안에 카메라 프리뷰 레이어 배치
-        setupCamera()
-        previewLayer.frame = cameraContainer.bounds
-        cameraContainer.layer.insertSublayer(previewLayer, at: 0)
+        // ARKit 얼굴 트래킹으로 카메라 프리뷰 대체
+        arView = ARSCNView(frame: cameraContainer.bounds)
+        arView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        cameraContainer.addSubview(arView)
+
+        let configuration = ARFaceTrackingConfiguration()
+        configuration.isLightEstimationEnabled = true
+        arView.session.delegate = self
+        arView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
 
         // 가이드 오버레이 뷰를 카메라 컨테이너에 추가하고 크기 맞춤
         guideOverlayView.frame = cameraContainer.bounds
@@ -132,40 +134,6 @@ final class FaceCaptureViewController: UIViewController {
         tabBarController?.tabBar.isHidden = false
     }
 
-    // AVFoundation을 사용해 카메라 입력 및 출력 설정
-    private func setupCamera() {
-        captureSession = AVCaptureSession()
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
-              let input = try? AVCaptureDeviceInput(device: device) else { return }
-
-        captureSession.beginConfiguration()
-        if captureSession.canAddInput(input) { captureSession.addInput(input) }
-
-        videoOutput = AVCaptureVideoDataOutput()
-        videoOutput.setSampleBufferDelegate(self, queue: captureQueue)
-        if captureSession.canAddOutput(videoOutput) { captureSession.addOutput(videoOutput) }
-
-        captureSession.commitConfiguration()
-
-        previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
-        previewLayer.videoGravity = .resizeAspectFill
-
-        // previewLayer.frame: viewDidLoad에서 cameraContainer에 삽입
-
-        captureSession.startRunning()
-    }
-
-    // 카메라 전후면 전환 버튼 UI 구성 및 동작 설정
-    private func setupSwitchCameraButton(captureButton: UIButton) {
-        view.addSubview(switchCameraButton)
-        NSLayoutConstraint.activate([
-            switchCameraButton.centerYAnchor.constraint(equalTo: captureButton.centerYAnchor),
-            switchCameraButton.leadingAnchor.constraint(equalTo: captureButton.trailingAnchor, constant: 20),
-            switchCameraButton.widthAnchor.constraint(equalToConstant: 50),
-            switchCameraButton.heightAnchor.constraint(equalToConstant: 50)
-        ])
-        switchCameraButton.addTarget(self, action: #selector(toggleCamera), for: .touchUpInside)
-    }
 
     // 촬영 버튼 UI 구성 및 눌렀을 때 행동 설정
     private func setupCaptureButton() {
@@ -185,26 +153,8 @@ final class FaceCaptureViewController: UIViewController {
         ])
 
         captureButton.addTarget(self, action: #selector(handleManualCapture), for: .touchUpInside)
-
-        setupSwitchCameraButton(captureButton: captureButton)
     }
 
-    @objc private func toggleCamera() {
-        isUsingFrontCamera.toggle()
-        captureSession.stopRunning()
-        captureSession.inputs.forEach { captureSession.removeInput($0) }
-
-        let position: AVCaptureDevice.Position = isUsingFrontCamera ? .front : .back
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position),
-              let input = try? AVCaptureDeviceInput(device: device) else { return }
-
-        captureSession.beginConfiguration()
-        if captureSession.canAddInput(input) {
-            captureSession.addInput(input)
-        }
-        captureSession.commitConfiguration()
-        captureSession.startRunning()
-    }
 
     // 현재 얼굴 위치와 매칭되는 이미지를 저장 (임베딩은 나중에 일괄 처리)
     private func saveFaceImage(_ image: UIImage) {
@@ -226,14 +176,155 @@ final class FaceCaptureViewController: UIViewController {
             print("다음 촬영 이동 \(next.description)")
             currentFacePosition = next
             guideOverlayView.currentPosition = currentFacePosition
-
-            let alert = UIAlertController(title: "안내", message: "\(next.description)을(를) 촬영해주세요.", preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "확인", style: .default))
-            present(alert, animated: true)
+            if next == .left {
+                setupLeftMode()
+            } else {
+                let alert = UIAlertController(title: "안내", message: "\(next.description)을(를) 촬영해주세요.", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "확인", style: .default))
+                present(alert, animated: true)
+            }
         } else {
             print("촬영 완료")
-            captureSession.stopRunning()
             saveAllVectors()
+        }
+    }
+
+    // ARKit 얼굴 트래킹 안내를 사용하여 왼쪽 측면 촬영 UI 준비
+    private func setupLeftMode() {
+        // AR 안내 이전에 초기 가이드 색상을 빨간색으로 설정
+        guideOverlayView.strokeColor = .red
+        // 즉시 촬영 버튼과 하단 라벨 숨기기
+        captureButton.isHidden = true
+        bottomLabel.isHidden = true
+        // 얼굴을 왼쪽으로 돌리도록 안내하는 라벨 표시
+        instructionLabel?.removeFromSuperview()
+        instructionLabel = UILabel()
+        instructionLabel?.text = "얼굴을 왼쪽으로 살짝 돌려주세요"
+        instructionLabel?.textColor = .white
+        instructionLabel?.font = UIFont.systemFont(ofSize: 15)
+        instructionLabel?.textAlignment = .center
+        instructionLabel?.translatesAutoresizingMaskIntoConstraints = false
+        if let instructionLabel = instructionLabel {
+            view.addSubview(instructionLabel)
+            NSLayoutConstraint.activate([
+                instructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                instructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+            ])
+        }
+        // AR 가이드 레이어를 오버레이하여 요(yaw) 시각화
+        configureLeftGuidanceLayers()
+    }
+
+    // 목표를 위한 세로 점선과 현재 위치를 위한 빈 실선 그리기
+    private func configureLeftGuidanceLayers() {
+        cameraContainer.layoutIfNeeded()
+        targetYawLayer?.removeFromSuperlayer()
+        currentYawLayer?.removeFromSuperlayer()
+
+        let containerBounds = cameraContainer.bounds
+
+        // 계산: leftTargetYaw(-π/6)에서 -π/2(왼쪽 끝)까지 선형 매핑
+        let fullLeftYaw: Float = -Float.pi / 2
+        let normalizedTarget = leftTargetYaw / fullLeftYaw // 0 to 1
+        let targetX = containerBounds.midX - (containerBounds.width / 2) * CGFloat(normalizedTarget)
+
+        // 점선 형태의 목표 위치(수직선)
+        let targetPath = UIBezierPath()
+        targetPath.move(to: CGPoint(x: targetX, y: 0))
+        targetPath.addLine(to: CGPoint(x: targetX, y: containerBounds.height))
+
+        let dashedLayer = CAShapeLayer()
+        dashedLayer.frame = containerBounds
+        dashedLayer.path = targetPath.cgPath
+        dashedLayer.strokeColor = UIColor.white.withAlphaComponent(0.7).cgColor
+        dashedLayer.lineWidth = 4
+        dashedLayer.lineDashPattern = [4, 6]
+        dashedLayer.fillColor = UIColor.clear.cgColor
+        cameraContainer.layer.addSublayer(dashedLayer)
+        targetYawLayer = dashedLayer
+        leftTargetX = targetX
+
+        // 실선 형태의 현재 얼굴 위치 추적용 레이어(처음에는 아무 경로 없음)
+        let currentLayer = CAShapeLayer()
+        currentLayer.frame = containerBounds
+        currentLayer.strokeColor = UIColor.white.cgColor
+        currentLayer.lineWidth = 6
+        currentLayer.fillColor = UIColor.clear.cgColor
+        cameraContainer.layer.addSublayer(currentLayer)
+        currentYawLayer = currentLayer
+    }
+
+    // 현재 얼굴 요(yaw)에 대한 세로 실선을 그리며, 예측된 요 값을 사용하여 카운트다운 로직 처리
+    private func updateCurrentYawVisualization(faceAnchor: ARFaceAnchor) {
+        cameraContainer.layoutIfNeeded()
+        guard let currentLayer = currentYawLayer, let targetX = leftTargetX else { return }
+
+        let containerBounds = cameraContainer.bounds
+
+        // simd_float4x4를 SCNNode로 변환하여 요(yaw) 오일러 각도 추출
+        let node = SCNNode()
+        node.simdTransform = faceAnchor.transform
+        let yaw: Float = node.eulerAngles.y
+
+        // 왼쪽 완전 측면(-π/2)에서 오른쪽 완전 측면(+π/2) 사이로 정규화
+        let fullLeftYaw: Float = -Float.pi / 2
+        let fullRightYaw: Float = +Float.pi / 2
+
+        // 현재 yaw를 0.0 ~ 1.0 사이로 정규화
+        let normalizedCurrent = (yaw - fullLeftYaw) / (fullRightYaw - fullLeftYaw)
+
+        // 컨테이너 뷰 가로 폭에 매핑하여 화면 X 좌표 계산
+        let currentX = containerBounds.minX + CGFloat(normalizedCurrent) * containerBounds.width
+
+        // 실선 경로 그리기
+        let linePath = UIBezierPath()
+        linePath.move(to: CGPoint(x: currentX - containerBounds.minX, y: 0))
+        linePath.addLine(to: CGPoint(x: currentX - containerBounds.minX, y: containerBounds.height))
+        currentLayer.path = linePath.cgPath
+
+        // 타겟 위치와의 픽셀 거리 계산
+        let diffX = abs(currentX - targetX)
+        let pixelThreshold: CGFloat = 10
+
+        if diffX < pixelThreshold && countdownTimer == nil {
+            // 목표 지점에 도달하면 카운트다운 안내 표시 및 시작
+            guideOverlayView.strokeColor = .green
+            instructionLabel?.removeFromSuperview()
+            instructionLabel = UILabel()
+            instructionLabel?.text = "3초 후 자동으로 촬영됩니다"
+            instructionLabel?.textColor = .white
+            instructionLabel?.font = UIFont.systemFont(ofSize: 15)
+            instructionLabel?.textAlignment = .center
+            instructionLabel?.translatesAutoresizingMaskIntoConstraints = false
+            if let instructionLabel = instructionLabel {
+                view.addSubview(instructionLabel)
+                NSLayoutConstraint.activate([
+                    instructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                    instructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+                ])
+            }
+            isCountingDownActive = true
+            // countdownLabel이 없으면 생성하여 추가 (handleManualCapture와 유사)
+            if countdownLabel == nil {
+                countdownLabel = UILabel()
+                countdownLabel?.textColor = .white
+                countdownLabel?.font = UIFont.systemFont(ofSize: 60, weight: .bold)
+                countdownLabel?.textAlignment = .center
+                countdownLabel?.translatesAutoresizingMaskIntoConstraints = false
+                if let countdownLabel = countdownLabel {
+                    view.addSubview(countdownLabel)
+                    NSLayoutConstraint.activate([
+                        countdownLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                        countdownLabel.bottomAnchor.constraint(equalTo: cameraContainer.topAnchor, constant: -16)
+                    ])
+                }
+            }
+            countdownLabel?.text = "\(countdownCount)"
+            startCountdown()
+        } else if diffX >= pixelThreshold && countdownTimer != nil {
+            // 임계치 벗어나면 카운트다운 리셋
+            guideOverlayView.strokeColor = .red
+            resetCountdown()
         }
     }
 
@@ -294,7 +385,6 @@ final class FaceCaptureViewController: UIViewController {
 
         // 버튼 및 하단 안내 라벨 숨기기
         captureButton.isHidden = true
-        switchCameraButton.isHidden = true
         bottomLabel.isHidden = true
 
         // 상단 카운트다운 라벨 생성
@@ -314,7 +404,7 @@ final class FaceCaptureViewController: UIViewController {
 
         // 하단 촬영 안내 라벨 생성 (초기 안내 문구)
         instructionLabel = UILabel()
-        instructionLabel?.text = "얼굴이 가이드 프레임 안에 들어오면 자동으로 촬영됩니다"
+        instructionLabel?.text = "3초 후 자동으로 촬영됩니다"
         instructionLabel?.textColor = .white
         instructionLabel?.font = UIFont.systemFont(ofSize: 15)
         instructionLabel?.textAlignment = .center
@@ -385,22 +475,37 @@ final class FaceCaptureViewController: UIViewController {
 
     // 카운트다운 후 사진 촬영 및 저장
     private func capturePhoto() {
-        guard let sampleBuffer = currentSampleBuffer,
-              let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        guard let currentFrame = arView.session.currentFrame else { return }
+        let pixelBuffer = currentFrame.capturedImage
 
-        let ciImage = CIImage(cvImageBuffer: pixelBuffer)
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         let context = CIContext()
         guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return }
         let image = UIImage(cgImage: cgImage)
         saveFaceImage(image)
     }
-}
 
-extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
-    // 카메라 실시간 출력에서 얼굴 인식 여부 판단하여 프레임 색상 변경 (중앙 가이드 내에 얼굴이 있는지 확인)
-    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+    // MARK: - ARSessionDelegate (AR 세션 델리게이트)
+    func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        // 왼쪽 모드인 경우 ARFaceAnchor를 사용하여 실시간 위치 계산
+        if currentFacePosition == .left {
+            for anchor in frame.anchors {
+                if let faceAnchor = anchor as? ARFaceAnchor {
+                    DispatchQueue.main.async {
+                        self.updateCurrentYawVisualization(faceAnchor: faceAnchor)
+                    }
+                    break
+                }
+            }
+            return
+        }
+        // 그렇지 않으면 Vision 기반 정면 얼굴 검증 사용
+        let pixelBuffer = frame.capturedImage
+        validateFrontFace(on: pixelBuffer)
+    }
 
+    // Vision 얼굴 검증 로직을 ARKit 프레임에 맞게 분리
+    private func validateFrontFace(on pixelBuffer: CVPixelBuffer) {
         // 현재 얼굴 위치에 따라 guideRect 정의 (UIKit 좌표계)
         let guideRectInView: CGRect
         switch currentFacePosition {
@@ -420,6 +525,18 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
                                      width: 310,
                                      height: 280)
         }
+
+        // 이전 디버그 레이어 제거
+        debugGuideLayer?.removeFromSuperlayer()
+        // guideRectInView를 위한 디버그 사각형 그리기
+        let layer = CAShapeLayer()
+        layer.frame = view.bounds
+        layer.strokeColor = UIColor.red.withAlphaComponent(0.7).cgColor
+        layer.fillColor = UIColor.clear.cgColor
+        layer.lineWidth = 2
+        layer.path = UIBezierPath(rect: guideRectInView).cgPath
+        view.layer.addSublayer(layer)
+        debugGuideLayer = layer
 
         // UIKit의 guideRect를 Vision의 정규화된 regionOfInterest 좌표로 변환
         let normalizedX      = guideRectInView.origin.x / view.bounds.width
@@ -476,11 +593,28 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
                         return CGPoint(x: x, y: y)
                     }
 
-                    let leftEyePoints = landmarks.leftEye?.normalizedPoints.map(convertLandmarkPoint) ?? []
-                    let rightEyePoints = landmarks.rightEye?.normalizedPoints.map(convertLandmarkPoint) ?? []
-                    let nosePoints = landmarks.nose?.normalizedPoints.map(convertLandmarkPoint) ?? []
-                    let mouthPoints = (landmarks.outerLips?.normalizedPoints.map(convertLandmarkPoint)) ??
-                                      (landmarks.innerLips?.normalizedPoints.map(convertLandmarkPoint)) ?? []
+                    // 분리하여 복잡한 map 체인을 나눔
+                    var leftEyePoints: [CGPoint] = []
+                    if let leftEyeNorm = landmarks.leftEye?.normalizedPoints {
+                        leftEyePoints = leftEyeNorm.map(convertLandmarkPoint)
+                    }
+
+                    var rightEyePoints: [CGPoint] = []
+                    if let rightEyeNorm = landmarks.rightEye?.normalizedPoints {
+                        rightEyePoints = rightEyeNorm.map(convertLandmarkPoint)
+                    }
+
+                    var nosePoints: [CGPoint] = []
+                    if let noseNorm = landmarks.nose?.normalizedPoints {
+                        nosePoints = noseNorm.map(convertLandmarkPoint)
+                    }
+
+                    var mouthPoints: [CGPoint] = []
+                    if let outerNorm = landmarks.outerLips?.normalizedPoints {
+                        mouthPoints = outerNorm.map(convertLandmarkPoint)
+                    } else if let innerNorm = landmarks.innerLips?.normalizedPoints {
+                        mouthPoints = innerNorm.map(convertLandmarkPoint)
+                    }
 
                     // 각 랜드마크(왼쪽 눈, 오른쪽 눈, 코, 입) 점 개수 기준 검증
                     let hasLeftEye = leftEyePoints.count >= 3
@@ -514,28 +648,18 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
                     let heightRatio = intersection.height / faceRect.height
 
                     // 위치에 따라 다른 임계값 사용 (정면은 더 엄격, 측면은 완화)
-                    let areaThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.40 : 0.30
+                    let areaThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.75 : 0.35
                     let heightThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.45 : 0.30
                     let isWithinGuideArea = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
                     let isWithinGuideHeight = heightRatio > heightThreshold
 
-                    let minFaceWidth: CGFloat  = 50
-                    let minFaceHeight: CGFloat = 80
+                    let minFaceWidth: CGFloat  = 100
+                    let minFaceHeight: CGFloat = 120
                     let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
 
                     let isValidFace = landmarksInsideGuide && isWithinGuideArea && isWithinGuideHeight && isFaceLargeEnough
 
                     DispatchQueue.main.async {
-                        self.view.viewWithTag(999)?.removeFromSuperview()
-                        let debugRect = CGRect(x: guideRect.origin.x, y: guideRect.origin.y,
-                                               width: guideRect.width, height: guideRect.height)
-                        let debugView = UIView(frame: debugRect)
-                        debugView.layer.borderWidth = 2
-                        debugView.layer.borderColor = UIColor.yellow.cgColor
-                        debugView.backgroundColor = .clear
-                        debugView.tag = 999
-                        self.view.addSubview(debugView)
-
                         self.guideOverlayView.strokeColor = isValidFace ? .green : .red
                         self.isFaceDetected = isValidFace
                         // 카운트다운 활성 상태에서 얼굴 인식 변화 처리
@@ -557,6 +681,7 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
                                             instructionLabel.bottomAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
                                         ])
                                     }
+                                    self.bottomLabel.text = "3초 후 자동으로 촬영됩니다"
                                     self.startCountdown()
                                 }
                             } else {
@@ -564,10 +689,8 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
                                 if self.countdownTimer != nil {
                                     self.resetCountdown()
                                 }
+                                self.bottomLabel.text = "얼굴 정면을 가이드 프레임 안에 맞춰주세요"
                             }
-                        }
-                        if isValidFace {
-                            self.currentSampleBuffer = sampleBuffer
                         }
                     }
                 } else {
@@ -622,7 +745,7 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
                         case .front:
                             guideRect = CGRect(x: self.view.bounds.midX - 150,
                                                y: self.view.bounds.midY - 140,
-                                               width: 300, height: 280)
+                                               width: 280, height: 280)
                         case .left:
                             guideRect = CGRect(x: self.view.bounds.midX - 200,
                                                y: self.view.bounds.midY - 140,
@@ -639,28 +762,18 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
                         let faceArea = faceRect.width * faceRect.height
                         let heightRatio = intersection.height / faceRect.height
 
-                        let areaThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.75 : 0.45
+                        let areaThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.60 : 0.45
                         let heightThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.6 : 0.4
                         let isWithinGuideArea = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
                         let isWithinGuideHeight = heightRatio > heightThreshold
 
                         let minFaceWidth: CGFloat = 85
-                        let minFaceHeight: CGFloat = 120
+                        let minFaceHeight: CGFloat = 100
                         let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
 
                         let isValidFace = isWithinGuideArea && isWithinGuideHeight && isFaceLargeEnough
 
                         DispatchQueue.main.async {
-                            self.view.viewWithTag(999)?.removeFromSuperview()
-                            let debugRect = CGRect(x: guideRect.origin.x, y: guideRect.origin.y,
-                                                   width: guideRect.width, height: guideRect.height)
-                            let debugView = UIView(frame: debugRect)
-                            debugView.layer.borderWidth = 2
-                            debugView.layer.borderColor = UIColor.yellow.cgColor
-                            debugView.backgroundColor = .clear
-                            debugView.tag = 999
-                            self.view.addSubview(debugView)
-
                             self.guideOverlayView.strokeColor = isValidFace ? .green : .red
                             self.isFaceDetected = isValidFace
                             // 카운트다운 활성 상태에서 얼굴 인식 변화 처리
@@ -674,9 +787,6 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
                                         self.resetCountdown()
                                     }
                                 }
-                            }
-                            if isValidFace {
-                                self.currentSampleBuffer = sampleBuffer
                             }
                         }
                     }
@@ -754,32 +864,31 @@ extension FaceCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelegat
                 let faceArea = faceRect.width * faceRect.height
                 let heightRatio = intersection.height / faceRect.height
 
-                let areaThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.75 : 0.45
+                let areaThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.60 : 0.45
                 let heightThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.6 : 0.4
                 let isWithinGuideArea = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
                 let isWithinGuideHeight = heightRatio > heightThreshold
 
                 let minFaceWidth: CGFloat = 85
-                let minFaceHeight: CGFloat = 120
+                let minFaceHeight: CGFloat = 100
                 let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
 
                 let isValidFace = isWithinGuideArea && isWithinGuideHeight && isFaceLargeEnough
 
                 DispatchQueue.main.async {
-                    self.view.viewWithTag(999)?.removeFromSuperview()
-                    let debugRect = CGRect(x: guideRect.origin.x, y: guideRect.origin.y,
-                                           width: guideRect.width, height: guideRect.height)
-                    let debugView = UIView(frame: debugRect)
-                    debugView.layer.borderWidth = 2
-                    debugView.layer.borderColor = UIColor.yellow.cgColor
-                    debugView.backgroundColor = .clear
-                    debugView.tag = 999
-                    self.view.addSubview(debugView)
-
                     self.guideOverlayView.strokeColor = isValidFace ? .green : .red
                     self.isFaceDetected = isValidFace
-                    if isValidFace {
-                        self.currentSampleBuffer = sampleBuffer
+                    // 카운트다운 활성 상태에서 얼굴 인식 변화 처리
+                    if self.isCountingDownActive {
+                        if self.isFaceDetected {
+                            if self.countdownTimer == nil {
+                                self.startCountdown()
+                            }
+                        } else {
+                            if self.countdownTimer != nil {
+                                self.resetCountdown()
+                            }
+                        }
                     }
                 }
             }
