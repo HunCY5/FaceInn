@@ -16,15 +16,7 @@ final class CheckInViewController: UIViewController {
     // 통계 뷰와 valueLabel을 함께 저장하여 값만 갱신할 수 있도록
     private var statViews: [(container: UIView, valueLabel: UILabel)] = []
 
-    private let dummyRecents: [RecentRecognition] = [
-        RecentRecognition(guestName: "김철수", roomNumber: "객실 101", mode: .checkin, time: "14:23"),
-        RecentRecognition(guestName: "이영희", roomNumber: "객실 203", mode: .checkout, time: "11:45"),
-        RecentRecognition(guestName: "박민수", roomNumber: "객실 305", mode: .checkin, time: "16:12"),
-        // 테스트용 더미 데이터를 더 추가하면 테이블뷰가 스크롤됩니다.
-        RecentRecognition(guestName: "테스트1", roomNumber: "객실 401", mode: .checkout, time: "10:00"),
-        RecentRecognition(guestName: "테스트2", roomNumber: "객실 402", mode: .checkin, time: "10:05"),
-        RecentRecognition(guestName: "테스트3", roomNumber: "객실 403", mode: .checkout, time: "10:10")
-    ]
+    private var recents: [RecentRecognition] = []
 
     // MARK: - View 프로퍼티
 
@@ -52,6 +44,102 @@ final class CheckInViewController: UIViewController {
         configureRecentSection()
         // Firestore에서 통계 실시간 집계
         fetchStats()
+        fetchRecents()
+    }
+    private func fetchRecents() {
+        guard let hostId = Auth.auth().currentUser?.uid else { return }
+        let db = Firestore.firestore()
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: Date())
+        let startOfTomorrow = calendar.date(byAdding: .day, value: 1, to: startOfToday)!
+
+        var allRecents: [RecentRecognition] = []
+        let group = DispatchGroup()
+
+        // 오늘 체크인 (startDate)
+        group.enter()
+        db.collection("reserves")
+          .whereField("hostId", isEqualTo: hostId)
+          .whereField("startDate", isGreaterThanOrEqualTo: Timestamp(date: startOfToday))
+          .whereField("startDate", isLessThan: Timestamp(date: startOfTomorrow))
+          .whereField("checkIn", isEqualTo: true)
+          .order(by: "checkInTimeStamp", descending: true)
+          .getDocuments { [weak self] snapshot, error in
+              guard let self = self else { group.leave(); return }
+              let documents = snapshot?.documents ?? []
+              let innerGroup = DispatchGroup()
+              for doc in documents {
+                  let data = doc.data()
+                  guard let userId = data["userId"] as? String else { continue }
+                  let roomNumber = data["roomName"] as? String ?? "-"
+                  let ts = data["checkInTimeStamp"] as? Timestamp
+                  let timeStr = ts != nil ? self.formatHourMinute(ts: ts!) : ""
+                  innerGroup.enter()
+                  db.collection("users").document(userId).getDocument { userDoc, _ in
+                      let guestName = userDoc?.data()?["name"] as? String ?? "-"
+                      allRecents.append(.init(guestName: guestName, roomNumber: roomNumber, mode: .checkin, time: timeStr))
+                      innerGroup.leave()
+                  }
+              }
+              innerGroup.notify(queue: .main) {
+                  group.leave()
+              }
+          }
+
+        // 오늘 체크아웃 (endDate)
+        group.enter()
+        db.collection("reserves")
+          .whereField("hostId", isEqualTo: hostId)
+          .whereField("endDate", isGreaterThanOrEqualTo: Timestamp(date: startOfToday))
+          .whereField("endDate", isLessThan: Timestamp(date: startOfTomorrow))
+          .whereField("checkOut", isEqualTo: true)
+          .order(by: "checkOutTimeStamp", descending: true)
+          .getDocuments { [weak self] snapshot, error in
+              guard let self = self else { group.leave(); return }
+              let documents = snapshot?.documents ?? []
+              let innerGroup = DispatchGroup()
+              for doc in documents {
+                  let data = doc.data()
+                  guard let userId = data["userId"] as? String else { continue }
+                  let roomNumber = data["roomName"] as? String ?? "-"
+                  let ts = data["checkOutTimeStamp"] as? Timestamp
+                  let timeStr = ts != nil ? self.formatHourMinute(ts: ts!) : ""
+                  innerGroup.enter()
+                  db.collection("users").document(userId).getDocument { userDoc, _ in
+                      let guestName = userDoc?.data()?["name"] as? String ?? "-"
+                      allRecents.append(.init(guestName: guestName, roomNumber: roomNumber, mode: .checkout, time: timeStr))
+                      innerGroup.leave()
+                  }
+              }
+              innerGroup.notify(queue: .main) {
+                  group.leave()
+              }
+          }
+
+        // 결과 취합
+        group.notify(queue: .main) { [weak self] in
+            guard let self = self else { return }
+            // 최신순 정렬 및 최대 20개만
+            let sorted = allRecents.sorted {
+                if $0.mode == .checkin && $1.mode == .checkout {
+                    return $0.time > $1.time
+                } else if $0.mode == .checkout && $1.mode == .checkin {
+                    return $0.time > $1.time
+                } else {
+                    return $0.time > $1.time
+                }
+            }
+            self.recents = Array(sorted.prefix(20))
+            self.recentTableView.reloadData()
+        }
+    }
+
+    private func formatHourMinute(ts: Timestamp) -> String {
+        let date = ts.dateValue()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.locale = Locale(identifier: "ko_KR")
+        return formatter.string(from: date)
     }
 
     // MARK: - 네비게이션 바 설정
@@ -333,14 +421,14 @@ final class CheckInViewController: UIViewController {
 
 extension CheckInViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return dummyRecents.count
+        return recents.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         guard let cell = tableView.dequeueReusableCell(withIdentifier: RecentRecognitionCell.identifier, for: indexPath) as? RecentRecognitionCell else {
             return UITableViewCell()
         }
-        let data = dummyRecents[indexPath.row]
+        let data = recents[indexPath.row]
         cell.configure(with: data)
         return cell
     }
