@@ -385,11 +385,11 @@ final class ProfileView: UIView {
         faceIDStack.spacing = 12
         faceIDStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let faceIDIcon = UIImageView(image: UIImage(systemName: "faceid"))
+        let faceIDIcon = UIImageView(image: UIImage(named: "AppLogo"))
         faceIDIcon.tintColor = UIColor(red: 0x2f/255, green: 0xaf/255, blue: 0x53/255, alpha: 1)
         faceIDIcon.translatesAutoresizingMaskIntoConstraints = false
-        faceIDIcon.widthAnchor.constraint(equalToConstant: 40).isActive = true
-        faceIDIcon.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        faceIDIcon.widthAnchor.constraint(equalToConstant: 60).isActive = true
+        faceIDIcon.heightAnchor.constraint(equalToConstant: 60).isActive = true
 
         let faceIDTextStack = UIStackView()
         faceIDTextStack.axis = .vertical
