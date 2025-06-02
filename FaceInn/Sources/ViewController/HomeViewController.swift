@@ -284,13 +284,21 @@ final class HomeViewController: UIViewController {
                 UserDefaults.standard.integer(forKey: "selectedGuestCount") : 2
 
             self.filteredAccommodations = self.accommodations.filter { accommodation in
-                guard let rooms = accommodation.rooms else { return false }
+                guard let rooms = accommodation.rooms, !rooms.isEmpty else {
+                    return true
+                }
                 // 해당 호텔의 rooms 중 하나라도 guestCount 이상 수용 가능한 객실이 있어야 포함
                 return rooms.contains { room in
                     if let maxOccupancy = room["maxOccupancy"] as? Int {
                         return maxOccupancy >= guestCount
                     }
                     return false
+                }
+            }
+            let selectedLocation = UserDefaults.standard.string(forKey: "selectedLocation") ?? "위치"
+            if selectedLocation != "위치" {
+                self.filteredAccommodations = self.filteredAccommodations.filter {
+                    $0.location.localizedCaseInsensitiveContains(selectedLocation)
                 }
             }
             DispatchQueue.main.async {

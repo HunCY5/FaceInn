@@ -45,6 +45,11 @@ final class WishlistViewController: UIViewController {
 
         loadWishlist()
     }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        reloadWishlist()
+    }
 
     @objc private func reloadWishlist() {
         filteredAccommodations.removeAll()
@@ -114,12 +119,17 @@ final class WishlistViewController: UIViewController {
             }
 
             group.notify(queue: .main) {
-                // Remove any existing info label before adding a new one
-                self.view.subviews.filter { $0 is UILabel && ($0 as? UILabel)?.text == "숙소를 검색하고 찜목록에 추가하세요" }.forEach { $0.removeFromSuperview() }
+                self.view.subviews.filter {
+                    $0 is UILabel && (
+                        ($0 as? UILabel)?.text == "로그인 후 이용해주세요" ||
+                        ($0 as? UILabel)?.text == "숙소를 검색하고 찜목록에 추가하세요"
+                    )
+                }.forEach { $0.removeFromSuperview() }
 
                 self.filteredAccommodations = loadedAccommodations
                 self.collectionView.reloadData()
-                if wishlist.isEmpty {
+
+                if loadedAccommodations.isEmpty {
                     let label = UILabel()
                     label.text = "숙소를 검색하고 찜목록에 추가하세요"
                     label.textAlignment = .center

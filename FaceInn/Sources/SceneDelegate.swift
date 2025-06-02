@@ -7,6 +7,7 @@
 
 import UIKit
 import FirebaseAuth
+import FirebaseFirestore
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
@@ -19,16 +20,32 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         let window = UIWindow(windowScene: windowScene)
-        // type: guest or host 구분하여 루트뷰 설정
         let userType = UserDefaults.standard.string(forKey: "userType") ?? "guest"
-        let rootVC: UIViewController
-        if userType == "host" {
-            rootVC = HostMainTabBarController()
+        let user = Auth.auth().currentUser
+        let db = Firestore.firestore()
+
+        if userType == "host", let uid = user?.uid {
+            db.collection("users").document(uid).getDocument { snapshot, error in
+                guard error == nil, let data = snapshot?.data() else {
+                    self.setRootViewController(MainTabBarController())
+                    return
+                }
+                if let accommodationId = data["accommodationId"] as? String, !accommodationId.isEmpty {
+                    self.setRootViewController(HostMainTabBarController())
+                } else {
+                    self.setRootViewController(AccommodationRegisterViewController())
+                }
+            }
         } else {
-            rootVC = MainTabBarController()
+            self.setRootViewController(MainTabBarController())
         }
-        window.rootViewController = rootVC
-        window.makeKeyAndVisible()
         self.window = window
+        return
+    }
+    private func setRootViewController(_ viewController: UIViewController) {
+        DispatchQueue.main.async {
+            self.window?.rootViewController = viewController
+            self.window?.makeKeyAndVisible()
+        }
     }
 }

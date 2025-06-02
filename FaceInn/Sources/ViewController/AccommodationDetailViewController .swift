@@ -452,6 +452,16 @@ final class AccommodationDetailViewController: UIViewController, UICollectionVie
             roomCard.onReserveButtonTapped = { [weak self] room in
                 guard let self = self, let accommodation = self.accommodation else { return }
 
+                let startDate = UserDefaults.standard.object(forKey: "selectedStartDate") as? Date
+                let endDate = UserDefaults.standard.object(forKey: "selectedEndDate") as? Date
+
+                guard let startDate = startDate, let endDate = endDate else {
+                    let alert = UIAlertController(title: "날짜 선택 필요", message: "두 개의 날짜를 선택해주세요.", preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "확인", style: .default))
+                    self.present(alert, animated: true)
+                    return
+                }
+
                 let reservationVC = ReservationViewController()
                 reservationVC.accommodation = accommodation
                 reservationVC.room = room
@@ -515,6 +525,8 @@ extension AccommodationDetailViewController: UIPopoverPresentationControllerDele
     }
     @objc private func sellerInfoTapped() {
         let vc = HostProfileViewController()
+        vc.accommodationName = self.accommodation?.name ?? ""
+        vc.accommodationAddress = self.accommodation?.location ?? ""
         vc.hostId = self.accommodation?.hostId ?? ""
         navigationController?.pushViewController(vc, animated: true)
     }
