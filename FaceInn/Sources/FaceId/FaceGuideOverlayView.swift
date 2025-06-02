@@ -108,14 +108,14 @@ final class FaceGuideOverlayView: UIView {
             )
         case .left:
             imageRect = CGRect(
-                x: rect.width * 0.15,
+                x: rect.width * 0.2,
                 y: (rect.height - imageSize.height) / 2,
                 width: imageSize.width,
                 height: imageSize.height
             )
         case .right:
             imageRect = CGRect(
-                x: rect.width * 0.85 - imageSize.width,
+                x: rect.width * 0.8 - imageSize.width,
                 y: (rect.height - imageSize.height) / 2,
                 width: imageSize.width,
                 height: imageSize.height

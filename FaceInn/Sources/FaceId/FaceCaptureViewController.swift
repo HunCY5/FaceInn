@@ -55,8 +55,6 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
     private let yawThreshold: Float = 0.1       // 목표 요(yaw) 주변 허용 오차
     private var leftTargetX: CGFloat?
 
-    // 디버깅용 가이드 사각형 레이어 (개발용)
-    private var debugGuideLayer: CAShapeLayer?
 
     // 뷰 로드 시 카메라 초기화 및 UI 요소 설정
     override func viewDidLoad() {
@@ -175,10 +173,10 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
 
     // 다음 얼굴 위치로 전환, 모든 촬영이 완료되면 임베딩 추출 및 저장 진행
     private func advanceToNextFacePosition() {
-        print("촬영됨 \(currentFacePosition.description) face")
+//        print("촬영됨 \(currentFacePosition.description) face")
 
         if let next = FaceGuideOverlayView.FacePosition.allCases.first(where: { !faceImages.keys.contains($0) }) {
-            print("다음 촬영 이동 \(next.description)")
+//            print("다음 촬영 이동 \(next.description)")
             currentFacePosition = next
             guideOverlayView.currentPosition = currentFacePosition
             if next == .left {
@@ -205,7 +203,6 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                 present(alert, animated: true)
             }
         } else {
-            print("촬영 완료")
             saveAllVectors()
         }
     }
@@ -563,6 +560,15 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                 self.delegate?.faceCaptureDidFinish()
                 self.navigationController?.popViewController(animated: true)
             })
+            // 모든 촬영 완료 후 AR 세션 및 카메라 관련 기능 중지
+            self.arView.session.pause()
+            self.arView.scene.rootNode.childNodes.forEach { $0.removeFromParentNode() }
+            self.arView.removeFromSuperview()
+            self.captureButton?.isEnabled = false
+            self.captureButton?.isHidden = true
+            self.bottomLabel?.isHidden = true
+            self.countdownLabel?.isHidden = true
+            self.instructionLabel?.isHidden = true
             self.present(alert, animated: true)
         }
     }
@@ -737,7 +743,6 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                     let distance = sqrt(dx*dx + dy*dy)
                     let isInsideCircle = distance < radius * 0.9 // 여유값
 
-                    print("화면 내 위치 여부:", isInsideCircle)
                     if !self.isFaceVisible || isInsideCircle != self.isFaceVisible {
                         self.isFaceVisible = isInsideCircle
                         if isInsideCircle {
@@ -794,17 +799,6 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                                      height: 280)
         }
 
-        // 이전 디버그 레이어 제거
-        debugGuideLayer?.removeFromSuperlayer()
-        // guideRectInView를 위한 디버그 사각형 그리기
-        let layer = CAShapeLayer()
-        layer.frame = view.bounds
-        layer.strokeColor = UIColor.red.withAlphaComponent(0.7).cgColor
-        layer.fillColor = UIColor.clear.cgColor
-        layer.lineWidth = 2
-        layer.path = UIBezierPath(rect: guideRectInView).cgPath
-        view.layer.addSublayer(layer)
-        debugGuideLayer = layer
 
         // UIKit의 guideRect를 Vision의 정규화된 regionOfInterest 좌표로 변환
         let normalizedX      = guideRectInView.origin.x / view.bounds.width
@@ -915,14 +909,14 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                     let faceArea = faceRect.width * faceRect.height
                     let heightRatio = intersection.height / faceRect.height
 
-                    // 위치에 따라 다른 임계값 사용 (정면은 더 엄격, 측면은 완화)
-                    let areaThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.75 : 0.35
-                    let heightThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.45 : 0.30
+                    // 위치에 따라 다른 임계값 사용(정면)
+                    let areaThreshold: CGFloat = 0.75
+                    let heightThreshold: CGFloat = 0.65
                     let isWithinGuideArea = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
                     let isWithinGuideHeight = heightRatio > heightThreshold
 
-                    let minFaceWidth: CGFloat  = 100
-                    let minFaceHeight: CGFloat = 120
+                    let minFaceWidth: CGFloat  = 150
+                    let minFaceHeight: CGFloat = 100
                     let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
 
                     let isValidFace = landmarksInsideGuide && isWithinGuideArea && isWithinGuideHeight && isFaceLargeEnough
@@ -1024,18 +1018,18 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                                                width: 310, height: 280)
                         }
 
-                        // 위치에 따라 다른 임계값 사용 (정면은 더 엄격, 측면은 완화)
+                        // 위치에 따라 다른 임계값 사용 (정면)
                         let intersection = guideRect.intersection(faceRect)
                         let intersectionArea = intersection.width * intersection.height
                         let faceArea = faceRect.width * faceRect.height
                         let heightRatio = intersection.height / faceRect.height
 
-                        let areaThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.60 : 0.45
-                        let heightThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.6 : 0.4
+                        let areaThreshold: CGFloat = 0.75
+                        let heightThreshold: CGFloat = 0.65
                         let isWithinGuideArea = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
                         let isWithinGuideHeight = heightRatio > heightThreshold
 
-                        let minFaceWidth: CGFloat = 85
+                        let minFaceWidth: CGFloat = 150
                         let minFaceHeight: CGFloat = 100
                         let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
 
