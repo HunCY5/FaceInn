@@ -8,9 +8,9 @@
 import UIKit
 
 final class SignUpView: UIView {
-
     // MARK: - UI Components
-
+    let scrollView = UIScrollView()
+    let stack = UIStackView()
     let nameTextField = SignUpView.makeTextField(placeholder: "이름")
     let birthdayTextField: UITextField = {
         let tf = UITextField()
@@ -18,22 +18,7 @@ final class SignUpView: UIView {
         tf.borderStyle = .roundedRect
         return tf
     }()
-
-    let birthdayPicker: UIDatePicker = {
-        let picker = UIDatePicker()
-        picker.datePickerMode = .date
-        picker.locale = Locale(identifier: "ko_KR")
-        picker.preferredDatePickerStyle = .wheels
-        return picker
-    }()
-
-    lazy var birthdayToolbar: UIToolbar = {
-        let toolbar = UIToolbar()
-        toolbar.sizeToFit()
-        let doneButton = UIBarButtonItem(title: "완료", style: .done, target: self, action: #selector(donePickingDate))
-        toolbar.setItems([doneButton], animated: false)
-        return toolbar
-    }()
+    let phoneTextField = SignUpView.makeTextField(placeholder: "전화번호(-없이 숫자만)", keyboardType: .numberPad)
     let emailTextField = SignUpView.makeTextField(placeholder: "이메일", keyboardType: .emailAddress)
     let checkEmailButton: UIButton = {
         let btn = UIButton(type: .system)
@@ -69,54 +54,76 @@ final class SignUpView: UIView {
         return label
     }()
 
+    let birthdayPicker: UIDatePicker = {
+        let picker = UIDatePicker()
+        picker.datePickerMode = .date
+        picker.locale = Locale(identifier: "ko_KR")
+        picker.preferredDatePickerStyle = .wheels
+        return picker
+    }()
+    lazy var birthdayToolbar: UIToolbar = {
+        let toolbar = UIToolbar()
+        toolbar.sizeToFit()
+        let doneButton = UIBarButtonItem(title: "완료", style: .done, target: self, action: #selector(donePickingDate))
+        toolbar.setItems([doneButton], animated: false)
+        return toolbar
+    }()
+
     // MARK: - Init
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .white
-        // Set up input view and accessory for birthdayTextField
+
+        // ScrollView & StackView
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(scrollView)
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+        stack.axis = .vertical
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 40),
+            stack.leadingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.trailingAnchor, constant: -24),
+            stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -48)
+        ])
+
+        [nameTextField, birthdayTextField, phoneTextField, emailTextField, statusLabel, checkEmailButton, passwordTextField, confirmPasswordTextField, passwordMatchLabel, signUpButton].forEach {
+            stack.addArrangedSubview($0)
+        }
+        signUpButton.heightAnchor.constraint(equalToConstant: 48).isActive = true
+
+        // birthday
         birthdayTextField.inputView = birthdayPicker
         birthdayTextField.inputAccessoryView = birthdayToolbar
-        setupLayout()
+
+        // 모든 텍스트필드에 "완료" 버튼
+        addDoneButtonToKeyboard(for: nameTextField)
+        addDoneButtonToKeyboard(for: phoneTextField)
+        addDoneButtonToKeyboard(for: emailTextField)
+        addDoneButtonToKeyboard(for: passwordTextField)
+        addDoneButtonToKeyboard(for: confirmPasswordTextField)
+
+        // 키보드 올라올 때 처리
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow), name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide), name: UIResponder.keyboardWillHideNotification, object: nil)
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    // MARK: - Layout
-
-    private func setupLayout() {
-        let stack = UIStackView(arrangedSubviews: [
-            nameTextField,
-            birthdayTextField,
-            emailTextField,
-            statusLabel,
-            checkEmailButton,
-            passwordTextField,
-            confirmPasswordTextField,
-            passwordMatchLabel,
-            signUpButton
-        ])
-        stack.axis = .vertical
-        stack.spacing = 12
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
-
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 40),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -24)
-        ])
-
-        signUpButton.heightAnchor.constraint(equalToConstant: 48).isActive = true
-    }
-
     // MARK: - Factory
 
-    private static func makeTextField(placeholder: String,
-                                      keyboardType: UIKeyboardType = .default,
-                                      isSecure: Bool = false) -> UITextField {
+    private static func makeTextField(placeholder: String, keyboardType: UIKeyboardType = .default, isSecure: Bool = false) -> UITextField {
         let tf = UITextField()
         tf.placeholder = placeholder
         tf.borderStyle = .roundedRect
@@ -125,9 +132,14 @@ final class SignUpView: UIView {
         tf.autocapitalizationType = .none
         return tf
     }
-    // MARK: - Birthday String
-    var birthdayString: String {
-        return birthdayTextField.text ?? ""
+
+    // MARK: - Keyboard "완료" 버튼
+    private func addDoneButtonToKeyboard(for textField: UITextField) {
+        let toolbar = UIToolbar()
+        toolbar.sizeToFit()
+        let done = UIBarButtonItem(title: "완료", style: .done, target: self, action: #selector(doneTapped))
+        toolbar.items = [done]
+        textField.inputAccessoryView = toolbar
     }
 
     @objc private func donePickingDate() {
@@ -136,9 +148,25 @@ final class SignUpView: UIView {
         birthdayTextField.text = formatter.string(from: birthdayPicker.date)
         endEditing(true)
     }
-    
-    override func didMoveToWindow() {
-        super.didMoveToWindow()
-        nameTextField.becomeFirstResponder()
+
+    @objc private func doneTapped() {
+        endEditing(true)
+    }
+
+    // MARK: - Keyboard Scroll Handling
+    @objc private func keyboardWillShow(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let keyboardFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+        let keyboardHeight = keyboardFrame.height
+        scrollView.contentInset.bottom = keyboardHeight + 16
+        scrollView.verticalScrollIndicatorInsets.bottom = keyboardHeight
+    }
+
+    @objc private func keyboardWillHide(_ notification: Notification) {
+        scrollView.contentInset.bottom = 0
+        scrollView.verticalScrollIndicatorInsets.bottom = 0
+    }
+    var birthdayString: String {
+        birthdayTextField.text ?? ""
     }
 }
