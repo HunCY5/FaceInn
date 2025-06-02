@@ -12,7 +12,7 @@ final class LoginView: UIView {
     // MARK: - UI Elements
 
     let logoImageView: UIImageView = {
-        let iv = UIImageView(image: UIImage(named: "AppIcon"))
+        let iv = UIImageView(image: UIImage(named: "AppLogo"))
         iv.contentMode = .scaleAspectFit
         return iv
     }()
