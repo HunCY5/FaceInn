@@ -663,8 +663,10 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
         if let caution = view.viewWithTag(9001) {
             caution.removeFromSuperview()
         }
-        // 카운트다운 모드는 비활성화
-        isCountingDownActive = false
+        // 카운트다운 모드는 비활성화 (단, front 모드에서는 true 유지)
+        if currentFacePosition != .front {
+            isCountingDownActive = false
+        }
         // 왼쪽/오른쪽 측면 모드일 때: 안내+주의 라벨 모두 하단에 재배치
         if currentFacePosition == .left || currentFacePosition == .right {
             let isLeft = currentFacePosition == .left
@@ -910,48 +912,65 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                     let heightRatio = intersection.height / faceRect.height
 
                     // 위치에 따라 다른 임계값 사용(정면)
-                    let areaThreshold: CGFloat = 0.75
+                    let areaThreshold: CGFloat = 0.65
                     let heightThreshold: CGFloat = 0.65
                     let isWithinGuideArea = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
                     let isWithinGuideHeight = heightRatio > heightThreshold
 
-                    let minFaceWidth: CGFloat  = 150
-                    let minFaceHeight: CGFloat = 100
+                    let minFaceWidth: CGFloat  = 140
+                    let minFaceHeight: CGFloat = 90
                     let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
 
                     let isValidFace = landmarksInsideGuide && isWithinGuideArea && isWithinGuideHeight && isFaceLargeEnough
 
                     DispatchQueue.main.async {
                         self.guideOverlayView.strokeColor = isValidFace ? .green : .red
+                        let previousFaceDetected = self.isFaceDetected
                         self.isFaceDetected = isValidFace
-                        // 카운트다운 활성 상태에서 얼굴 인식 변화 처리
+
                         if self.isCountingDownActive {
                             if self.isFaceDetected {
-                                // 얼굴이 인식되고 카운트다운이 진행 중이지 않다면 안내 문구 변경 후 카운트다운 시작
+                                // 안내문구 즉시 갱신 또는 생성
+                                if let label = self.instructionLabel, label.superview != nil {
+                                    label.text = "3초 후 자동으로 촬영됩니다"
+                                } else {
+                                    let newInstructionLabel = UILabel()
+                                    newInstructionLabel.text = "3초 후 자동으로 촬영됩니다"
+                                    newInstructionLabel.textColor = .white
+                                    newInstructionLabel.font = UIFont.systemFont(ofSize: 15)
+                                    newInstructionLabel.textAlignment = .center
+                                    newInstructionLabel.translatesAutoresizingMaskIntoConstraints = false
+                                    self.instructionLabel = newInstructionLabel
+                                    self.view.addSubview(newInstructionLabel)
+                                    NSLayoutConstraint.activate([
+                                        newInstructionLabel.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
+                                        newInstructionLabel.bottomAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+                                    ])
+                                }
                                 if self.countdownTimer == nil {
-                                    self.instructionLabel?.removeFromSuperview()
-                                    self.instructionLabel = UILabel()
-                                    self.instructionLabel?.text = "3초 후 자동으로 촬영됩니다"
-                                    self.instructionLabel?.textColor = .white
-                                    self.instructionLabel?.font = UIFont.systemFont(ofSize: 15)
-                                    self.instructionLabel?.textAlignment = .center
-                                    self.instructionLabel?.translatesAutoresizingMaskIntoConstraints = false
-                                    if let instructionLabel = self.instructionLabel {
-                                        self.view.addSubview(instructionLabel)
-                                        NSLayoutConstraint.activate([
-                                            instructionLabel.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
-                                            instructionLabel.bottomAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
-                                        ])
-                                    }
-                                    self.bottomLabel.text = "3초 후 자동으로 촬영됩니다"
+                                    self.countdownTimer?.invalidate()
+                                    self.countdownTimer = nil
+                                    self.countdownLabel?.removeFromSuperview()
                                     self.startCountdown()
                                 }
                             } else {
-                                // 얼굴이 인식되지 않으면 카운트다운 중단 및 리셋
+                                // 얼굴 해제시 안내문구 새로 생성
                                 if self.countdownTimer != nil {
                                     self.resetCountdown()
                                 }
-                                self.bottomLabel.text = "얼굴 정면을 가이드 프레임 안에 맞춰주세요"
+                                self.instructionLabel?.removeFromSuperview()
+                                let newInstructionLabel = UILabel()
+                                newInstructionLabel.text = "얼굴 정면을 가이드 프레임 안에 맞춰주세요"
+                                newInstructionLabel.textColor = .white
+                                newInstructionLabel.font = UIFont.systemFont(ofSize: 15)
+                                newInstructionLabel.textAlignment = .center
+                                newInstructionLabel.translatesAutoresizingMaskIntoConstraints = false
+                                self.instructionLabel = newInstructionLabel
+                                self.view.addSubview(newInstructionLabel)
+                                NSLayoutConstraint.activate([
+                                    newInstructionLabel.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
+                                    newInstructionLabel.bottomAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+                                ])
                             }
                         }
                     }
@@ -1024,13 +1043,13 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                         let faceArea = faceRect.width * faceRect.height
                         let heightRatio = intersection.height / faceRect.height
 
-                        let areaThreshold: CGFloat = 0.75
+                        let areaThreshold: CGFloat = 0.65
                         let heightThreshold: CGFloat = 0.65
                         let isWithinGuideArea = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
                         let isWithinGuideHeight = heightRatio > heightThreshold
 
-                        let minFaceWidth: CGFloat = 150
-                        let minFaceHeight: CGFloat = 100
+                        let minFaceWidth: CGFloat = 140
+                        let minFaceHeight: CGFloat = 90
                         let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
 
                         let isValidFace = isWithinGuideArea && isWithinGuideHeight && isFaceLargeEnough
@@ -1120,19 +1139,19 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                                        width: 310, height: 280)
                 }
 
-                // 위치에 따라 다른 임계값 사용 (정면은 더 엄격, 측면은 완화)
+                // 위치에 따라 다른 임계값 사용 (정면)
                 let intersection = guideRect.intersection(faceRect)
                 let intersectionArea = intersection.width * intersection.height
                 let faceArea = faceRect.width * faceRect.height
                 let heightRatio = intersection.height / faceRect.height
 
-                let areaThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.60 : 0.45
-                let heightThreshold: CGFloat = (self.currentFacePosition == .front) ? 0.6 : 0.4
+                let areaThreshold: CGFloat = 0.65
+                let heightThreshold: CGFloat = 0.65
                 let isWithinGuideArea = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
                 let isWithinGuideHeight = heightRatio > heightThreshold
 
-                let minFaceWidth: CGFloat = 85
-                let minFaceHeight: CGFloat = 100
+                let minFaceWidth: CGFloat = 140
+                let minFaceHeight: CGFloat = 90
                 let isFaceLargeEnough = faceRect.width >= minFaceWidth && faceRect.height >= minFaceHeight
 
                 let isValidFace = isWithinGuideArea && isWithinGuideHeight && isFaceLargeEnough
