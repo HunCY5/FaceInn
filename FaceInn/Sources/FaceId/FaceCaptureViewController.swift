@@ -1164,6 +1164,7 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                     // 카운트다운 활성 상태에서 얼굴 인식 변화 처리
                     if self.isCountingDownActive {
                         if self.isFaceDetected {
+
                             // 얼굴 인식 재개 시 안내문구 및 카운트다운 재개
                             if let label = self.instructionLabel, label.superview != nil {
                                 label.text = "3초 후 자동으로 촬영됩니다"
@@ -1181,6 +1182,7 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                                     newInstructionLabel.bottomAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
                                 ])
                             }
+
                             if self.countdownTimer == nil {
                                 self.startCountdown()
                             }
