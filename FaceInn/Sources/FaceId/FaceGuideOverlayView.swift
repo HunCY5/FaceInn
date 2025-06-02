@@ -77,8 +77,8 @@ final class FaceGuideOverlayView: UIView {
         context.fillPath()
         context.setBlendMode(.normal)
 
-        // 가이드 이미지 크기를 컨테이너 크기의 80%로 지정
-        let guideWidth = rect.width * 0.6
+        // 가이드 이미지 크기: 컨테이너 크기에 대한 비율
+        let guideWidth = rect.width * 0.5
         let guideHeight = rect.height * 0.75
         let imageSize = CGSize(width: guideWidth, height: guideHeight)
 
@@ -148,3 +148,4 @@ extension FaceGuideOverlayView.FacePosition: CustomStringConvertible {
         }
     }
 }
+

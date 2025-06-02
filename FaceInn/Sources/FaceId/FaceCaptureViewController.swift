@@ -34,6 +34,8 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
     private let guideOverlayView = FaceGuideOverlayView()
 
     private var isFaceDetected = false
+    // 화면에서 얼굴이 보이는지(ARKit 좌측 모드) 추적
+    private var isFaceVisible: Bool = false
     private var countdownTimer: Timer?
     private var isCountingDownActive = false
     private var countdownCount = 0
@@ -46,7 +48,10 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
     // 왼쪽 측면 안내 시각화 레이어 및 목표 요(yaw) 임계값
     private var currentYawLayer: CAShapeLayer?
     private var targetYawLayer: CAShapeLayer?
-    private let leftTargetYaw: Float = -22 * Float.pi / 180  // 약 −22°
+    private let leftTargetYaw: Float = -30 * Float.pi / 180  // 약 −30°
+    // 오른쪽 측면 안내 시각화 레이어 및 목표 요(yaw) 임계값
+    private var rightTargetYaw: Float = 30 * Float.pi / 180  // 약 +30°
+    private var rightTargetX: CGFloat?
     private let yawThreshold: Float = 0.1       // 목표 요(yaw) 주변 허용 오차
     private var leftTargetX: CGFloat?
 
@@ -177,7 +182,23 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
             currentFacePosition = next
             guideOverlayView.currentPosition = currentFacePosition
             if next == .left {
+                // 정면 촬영이 끝난 직후 좌측 측면 진입 시 가이드 색상 초기화
+                guideOverlayView.strokeColor = .red
+                instructionLabel?.removeFromSuperview()
+                instructionLabel = nil
+                if let caution = view.viewWithTag(9001) {
+                    caution.removeFromSuperview()
+                }
                 setupLeftMode()
+            } else if next == .right {
+                // 우측 측면 진입 시 가이드 색상 초기화 및 안내
+                guideOverlayView.strokeColor = .red
+                instructionLabel?.removeFromSuperview()
+                instructionLabel = nil
+                if let caution = view.viewWithTag(9001) {
+                    caution.removeFromSuperview()
+                }
+                setupRightMode()
             } else {
                 let alert = UIAlertController(title: "안내", message: "\(next.description)을(를) 촬영해주세요.", preferredStyle: .alert)
                 alert.addAction(UIAlertAction(title: "확인", style: .default))
@@ -188,6 +209,164 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
             saveAllVectors()
         }
     }
+    // ARKit 얼굴 트래킹 안내를 사용하여 오른쪽 측면 촬영 UI 준비
+    private func setupRightMode() {
+        // AR 안내 이전에 초기 가이드 색상을 빨간색으로 설정
+        guideOverlayView.strokeColor = .red
+        // 즉시 촬영 버튼과 하단 라벨 숨기기
+        captureButton.isHidden = true
+        bottomLabel.isHidden = true
+        instructionLabel?.removeFromSuperview()
+        instructionLabel = nil
+        if let caution = view.viewWithTag(9001) {
+            caution.removeFromSuperview()
+        }
+        // 얼굴을 오른쪽으로 돌리도록 안내하는 라벨 표시
+        let newInstructionLabel = UILabel()
+        newInstructionLabel.text = "얼굴을 오른쪽으로 살짝 돌려주세요"
+        newInstructionLabel.textColor = .white
+        newInstructionLabel.font = UIFont.systemFont(ofSize: 15)
+        newInstructionLabel.textAlignment = .center
+        newInstructionLabel.translatesAutoresizingMaskIntoConstraints = false
+        instructionLabel = newInstructionLabel
+        view.addSubview(newInstructionLabel)
+        NSLayoutConstraint.activate([
+            newInstructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            newInstructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+        ])
+        // 얼굴이 화면 밖으로 나가면 안된다는 라벨 추가
+        let cautionLabel = UILabel()
+        cautionLabel.text = "얼굴이 화면 밖으로 나가면 안됩니다"
+        cautionLabel.textColor = .systemYellow
+        cautionLabel.font = UIFont.systemFont(ofSize: 14)
+        cautionLabel.textAlignment = .center
+        cautionLabel.translatesAutoresizingMaskIntoConstraints = false
+        cautionLabel.tag = 9001
+        view.addSubview(cautionLabel)
+        NSLayoutConstraint.activate([
+            cautionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            cautionLabel.topAnchor.constraint(equalTo: newInstructionLabel.bottomAnchor, constant: 10)
+        ])
+        // AR 가이드 레이어를 오버레이하여 요(yaw) 시각화
+        configureRightGuidanceLayers()
+    }
+
+    // 목표를 위한 세로 점선과 현재 위치를 위한 빈 실선 그리기 (오른쪽)
+    private func configureRightGuidanceLayers() {
+        cameraContainer.layoutIfNeeded()
+        targetYawLayer?.removeFromSuperlayer()
+        currentYawLayer?.removeFromSuperlayer()
+
+        let containerBounds = cameraContainer.bounds
+
+        // 계산: rightTargetYaw(+π/6)에서 +π/2(오른쪽 끝)까지 선형 매핑
+        let fullRightYaw: Float = Float.pi / 2
+        let normalizedTarget = rightTargetYaw / fullRightYaw // 0 to 1
+        let targetX = containerBounds.midX + (containerBounds.width / 2) * CGFloat(normalizedTarget)
+
+        // 점선 형태의 목표 위치(수직선)
+        let targetPath = UIBezierPath()
+        targetPath.move(to: CGPoint(x: targetX, y: 0))
+        targetPath.addLine(to: CGPoint(x: targetX, y: containerBounds.height))
+
+        let dashedLayer = CAShapeLayer()
+        dashedLayer.frame = containerBounds
+        dashedLayer.path = targetPath.cgPath
+        dashedLayer.strokeColor = UIColor.white.withAlphaComponent(0.7).cgColor
+        dashedLayer.lineWidth = 4
+        dashedLayer.lineDashPattern = [4, 6]
+        dashedLayer.fillColor = UIColor.clear.cgColor
+        cameraContainer.layer.addSublayer(dashedLayer)
+        targetYawLayer = dashedLayer
+        rightTargetX = targetX
+
+        // 실선 형태의 현재 얼굴 위치 추적용 레이어(처음에는 아무 경로 없음)
+        let currentLayer = CAShapeLayer()
+        currentLayer.frame = containerBounds
+        currentLayer.strokeColor = UIColor.white.cgColor
+        currentLayer.lineWidth = 6
+        currentLayer.fillColor = UIColor.clear.cgColor
+        cameraContainer.layer.addSublayer(currentLayer)
+        currentYawLayer = currentLayer
+    }
+
+    // 현재 얼굴 요(yaw)에 대한 세로 실선을 그리며, 코 팁 위치를 사용하여 실선 X좌표를 계산 (오른쪽)
+    private func updateCurrentYawVisualizationRight(faceAnchor: ARFaceAnchor) {
+        cameraContainer.layoutIfNeeded()
+        guard let currentLayer = currentYawLayer, let targetX = rightTargetX else { return }
+
+        let containerBounds = cameraContainer.bounds
+
+        // 코 팁(코끝) landmark의 3D 좌표를 추출 (ARKit 기본 1220개 중 9번)
+        let noseIndex = 9
+        guard faceAnchor.geometry.vertices.count > noseIndex else { return }
+        let noseVertex = faceAnchor.geometry.vertices[noseIndex]
+        let noseWorldPosition = faceAnchor.transform * simd_float4(noseVertex.x, noseVertex.y, noseVertex.z, 1.0)
+        // SCNVector3로 변환 후 화면 2D로 투영
+        let nosePosition3D = SCNVector3(noseWorldPosition.x, noseWorldPosition.y, noseWorldPosition.z)
+        let projectedNose = arView.projectPoint(nosePosition3D)
+        let currentX = CGFloat(projectedNose.x)
+
+        // 실선 경로 그리기 (곡선은 기존처럼 유지)
+        let linePath = UIBezierPath()
+        linePath.move(to: CGPoint(x: currentX - containerBounds.minX, y: 0))
+        linePath.addLine(to: CGPoint(x: currentX - containerBounds.minX, y: containerBounds.height))
+        currentLayer.path = linePath.cgPath
+
+        // 기존 yaw 기반(좌우 이동 각도)은 유지 → 목표지점 proximity 비교 등은 이전 로직 그대로
+
+        // 타겟 위치와의 픽셀 거리 계산
+        let diffX = abs(currentX - targetX)
+        let pixelThreshold: CGFloat = 10
+
+        // 카운트다운 중일 때만 guideOverlayView.strokeColor를 green으로, 아니면 항상 빨간색 (측면 모드)
+        if isCountingDownActive {
+            guideOverlayView.strokeColor = .green
+        } else {
+            guideOverlayView.strokeColor = .red
+        }
+
+        if diffX < pixelThreshold && countdownTimer == nil {
+            // 목표 지점에 도달하면 카운트다운 안내 표시 및 시작
+            instructionLabel?.removeFromSuperview()
+            instructionLabel = nil
+            if let caution = view.viewWithTag(9001) {
+                caution.removeFromSuperview()
+            }
+            let newInstructionLabel = UILabel()
+            newInstructionLabel.text = "3초 후 자동으로 촬영됩니다"
+            newInstructionLabel.textColor = .white
+            newInstructionLabel.font = UIFont.systemFont(ofSize: 15)
+            newInstructionLabel.textAlignment = .center
+            newInstructionLabel.translatesAutoresizingMaskIntoConstraints = false
+            instructionLabel = newInstructionLabel
+            view.addSubview(newInstructionLabel)
+            NSLayoutConstraint.activate([
+                newInstructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                newInstructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+            ])
+            isCountingDownActive = true
+            // countdownLabel이 없으면 생성하여 추가 (handleManualCapture와 유사)
+            if countdownLabel == nil {
+                let newCountdownLabel = UILabel()
+                newCountdownLabel.textColor = .white
+                newCountdownLabel.font = UIFont.systemFont(ofSize: 60, weight: .bold)
+                newCountdownLabel.textAlignment = .center
+                newCountdownLabel.translatesAutoresizingMaskIntoConstraints = false
+                countdownLabel = newCountdownLabel
+                view.addSubview(newCountdownLabel)
+                NSLayoutConstraint.activate([
+                    newCountdownLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                    newCountdownLabel.bottomAnchor.constraint(equalTo: cameraContainer.topAnchor, constant: -16)
+                ])
+            }
+            countdownLabel?.text = "\(countdownCount)"
+            startCountdown()
+        } else if diffX >= pixelThreshold && countdownTimer != nil {
+            // 임계치 벗어나면 카운트다운 리셋
+            resetCountdown()
+        }
+    }
 
     // ARKit 얼굴 트래킹 안내를 사용하여 왼쪽 측면 촬영 UI 준비
     private func setupLeftMode() {
@@ -196,21 +375,37 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
         // 즉시 촬영 버튼과 하단 라벨 숨기기
         captureButton.isHidden = true
         bottomLabel.isHidden = true
-        // 얼굴을 왼쪽으로 돌리도록 안내하는 라벨 표시
         instructionLabel?.removeFromSuperview()
-        instructionLabel = UILabel()
-        instructionLabel?.text = "얼굴을 왼쪽으로 살짝 돌려주세요"
-        instructionLabel?.textColor = .white
-        instructionLabel?.font = UIFont.systemFont(ofSize: 15)
-        instructionLabel?.textAlignment = .center
-        instructionLabel?.translatesAutoresizingMaskIntoConstraints = false
-        if let instructionLabel = instructionLabel {
-            view.addSubview(instructionLabel)
-            NSLayoutConstraint.activate([
-                instructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                instructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
-            ])
+        instructionLabel = nil
+        if let caution = view.viewWithTag(9001) {
+            caution.removeFromSuperview()
         }
+        // 얼굴을 왼쪽으로 돌리도록 안내하는 라벨 표시
+        let newInstructionLabel = UILabel()
+        newInstructionLabel.text = "얼굴을 왼쪽으로 살짝 돌려주세요"
+        newInstructionLabel.textColor = .white
+        newInstructionLabel.font = UIFont.systemFont(ofSize: 15)
+        newInstructionLabel.textAlignment = .center
+        newInstructionLabel.translatesAutoresizingMaskIntoConstraints = false
+        instructionLabel = newInstructionLabel
+        view.addSubview(newInstructionLabel)
+        NSLayoutConstraint.activate([
+            newInstructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            newInstructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+        ])
+        // 얼굴이 화면 밖으로 나가면 안된다는 라벨 추가
+        let cautionLabel = UILabel()
+        cautionLabel.text = "얼굴이 화면 밖으로 나가면 안됩니다"
+        cautionLabel.textColor = .systemYellow
+        cautionLabel.font = UIFont.systemFont(ofSize: 14)
+        cautionLabel.textAlignment = .center
+        cautionLabel.translatesAutoresizingMaskIntoConstraints = false
+        cautionLabel.tag = 9001
+        view.addSubview(cautionLabel)
+        NSLayoutConstraint.activate([
+            cautionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            cautionLabel.topAnchor.constraint(equalTo: newInstructionLabel.bottomAnchor, constant: 10)
+        ])
         // AR 가이드 레이어를 오버레이하여 요(yaw) 시각화
         configureLeftGuidanceLayers()
     }
@@ -254,76 +449,80 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
         currentYawLayer = currentLayer
     }
 
-    // 현재 얼굴 요(yaw)에 대한 세로 실선을 그리며, 예측된 요 값을 사용하여 카운트다운 로직 처리
+    // 현재 얼굴 요(yaw)에 대한 세로 실선을 그리며, 코 팁 위치를 사용하여 실선 X좌표를 계산
     private func updateCurrentYawVisualization(faceAnchor: ARFaceAnchor) {
         cameraContainer.layoutIfNeeded()
         guard let currentLayer = currentYawLayer, let targetX = leftTargetX else { return }
 
         let containerBounds = cameraContainer.bounds
 
-        // simd_float4x4를 SCNNode로 변환하여 요(yaw) 오일러 각도 추출
-        let node = SCNNode()
-        node.simdTransform = faceAnchor.transform
-        let yaw: Float = node.eulerAngles.y
+        // 코 팁(코끝) landmark의 3D 좌표를 추출 (ARKit 기본 1220개 중 9번)
+        let noseIndex = 9
+        guard faceAnchor.geometry.vertices.count > noseIndex else { return }
+        let noseVertex = faceAnchor.geometry.vertices[noseIndex]
+        let noseWorldPosition = faceAnchor.transform * simd_float4(noseVertex.x, noseVertex.y, noseVertex.z, 1.0)
+        // SCNVector3로 변환 후 화면 2D로 투영
+        let nosePosition3D = SCNVector3(noseWorldPosition.x, noseWorldPosition.y, noseWorldPosition.z)
+        let projectedNose = arView.projectPoint(nosePosition3D)
+        let currentX = CGFloat(projectedNose.x)
 
-        // 왼쪽 완전 측면(-π/2)에서 오른쪽 완전 측면(+π/2) 사이로 정규화
-        let fullLeftYaw: Float = -Float.pi / 2
-        let fullRightYaw: Float = +Float.pi / 2
-
-        // 현재 yaw를 0.0 ~ 1.0 사이로 정규화
-        let normalizedCurrent = (yaw - fullLeftYaw) / (fullRightYaw - fullLeftYaw)
-
-        // 컨테이너 뷰 가로 폭에 매핑하여 화면 X 좌표 계산
-        let currentX = containerBounds.minX + CGFloat(normalizedCurrent) * containerBounds.width
-
-        // 실선 경로 그리기
+        // 실선 경로 그리기 (곡선은 기존처럼 유지)
         let linePath = UIBezierPath()
         linePath.move(to: CGPoint(x: currentX - containerBounds.minX, y: 0))
         linePath.addLine(to: CGPoint(x: currentX - containerBounds.minX, y: containerBounds.height))
         currentLayer.path = linePath.cgPath
 
+        // 기존 yaw 기반(좌우 이동 각도)은 유지 → 목표지점 proximity 비교 등은 이전 로직 그대로
+
         // 타겟 위치와의 픽셀 거리 계산
         let diffX = abs(currentX - targetX)
         let pixelThreshold: CGFloat = 10
 
+        // 카운트다운 중일 때만 guideOverlayView.strokeColor를 green으로, 아니면 항상 빨간색 (측면 모드)
+        if isCountingDownActive {
+            guideOverlayView.strokeColor = .green
+        } else {
+            guideOverlayView.strokeColor = .red
+        }
+
         if diffX < pixelThreshold && countdownTimer == nil {
             // 목표 지점에 도달하면 카운트다운 안내 표시 및 시작
-            guideOverlayView.strokeColor = .green
             instructionLabel?.removeFromSuperview()
-            instructionLabel = UILabel()
-            instructionLabel?.text = "3초 후 자동으로 촬영됩니다"
-            instructionLabel?.textColor = .white
-            instructionLabel?.font = UIFont.systemFont(ofSize: 15)
-            instructionLabel?.textAlignment = .center
-            instructionLabel?.translatesAutoresizingMaskIntoConstraints = false
-            if let instructionLabel = instructionLabel {
-                view.addSubview(instructionLabel)
-                NSLayoutConstraint.activate([
-                    instructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                    instructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
-                ])
+            instructionLabel = nil
+            if let caution = view.viewWithTag(9001) {
+                caution.removeFromSuperview()
             }
+            let newInstructionLabel = UILabel()
+            newInstructionLabel.text = "3초 후 자동으로 촬영됩니다"
+            newInstructionLabel.textColor = .white
+            newInstructionLabel.font = UIFont.systemFont(ofSize: 15)
+            newInstructionLabel.textAlignment = .center
+            newInstructionLabel.translatesAutoresizingMaskIntoConstraints = false
+            instructionLabel = newInstructionLabel
+            view.addSubview(newInstructionLabel)
+            NSLayoutConstraint.activate([
+                newInstructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                newInstructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+            ])
             isCountingDownActive = true
             // countdownLabel이 없으면 생성하여 추가 (handleManualCapture와 유사)
             if countdownLabel == nil {
-                countdownLabel = UILabel()
-                countdownLabel?.textColor = .white
-                countdownLabel?.font = UIFont.systemFont(ofSize: 60, weight: .bold)
-                countdownLabel?.textAlignment = .center
-                countdownLabel?.translatesAutoresizingMaskIntoConstraints = false
-                if let countdownLabel = countdownLabel {
-                    view.addSubview(countdownLabel)
-                    NSLayoutConstraint.activate([
-                        countdownLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                        countdownLabel.bottomAnchor.constraint(equalTo: cameraContainer.topAnchor, constant: -16)
-                    ])
-                }
+                let newCountdownLabel = UILabel()
+                newCountdownLabel.textColor = .white
+                newCountdownLabel.font = UIFont.systemFont(ofSize: 60, weight: .bold)
+                newCountdownLabel.textAlignment = .center
+                newCountdownLabel.translatesAutoresizingMaskIntoConstraints = false
+                countdownLabel = newCountdownLabel
+                view.addSubview(newCountdownLabel)
+                NSLayoutConstraint.activate([
+                    newCountdownLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                    newCountdownLabel.bottomAnchor.constraint(equalTo: cameraContainer.topAnchor, constant: -16)
+                ])
             }
             countdownLabel?.text = "\(countdownCount)"
             startCountdown()
         } else if diffX >= pixelThreshold && countdownTimer != nil {
             // 임계치 벗어나면 카운트다운 리셋
-            guideOverlayView.strokeColor = .red
             resetCountdown()
         }
     }
@@ -455,22 +654,56 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
         // 기존 안내 라벨 제거
         instructionLabel?.removeFromSuperview()
         instructionLabel = nil
-        // 카운트다운 모드는 여전히 활성 상태로 유지
-        isCountingDownActive = true
-        // 안내 라벨: 얼굴을 가이드 프레임 안에 맞춰달라는 문구
-        instructionLabel = UILabel()
-        instructionLabel?.text = "얼굴 정면을 가이드 프레임 안에 맞춰주세요"
-        instructionLabel?.textColor = .white
-        instructionLabel?.font = UIFont.systemFont(ofSize: 15)
-        instructionLabel?.textAlignment = .center
-        instructionLabel?.translatesAutoresizingMaskIntoConstraints = false
-        if let instructionLabel = instructionLabel {
-            view.addSubview(instructionLabel)
+        if let caution = view.viewWithTag(9001) {
+            caution.removeFromSuperview()
+        }
+        // 카운트다운 모드는 비활성화
+        isCountingDownActive = false
+        // 왼쪽/오른쪽 측면 모드일 때: 안내+주의 라벨 모두 하단에 재배치
+        if currentFacePosition == .left || currentFacePosition == .right {
+            let isLeft = currentFacePosition == .left
+            // 안내 라벨
+            let newInstructionLabel = UILabel()
+            newInstructionLabel.text = isLeft ? "얼굴을 왼쪽으로 살짝 돌려주세요" : "얼굴을 오른쪽으로 살짝 돌려주세요"
+            newInstructionLabel.textColor = .white
+            newInstructionLabel.font = UIFont.systemFont(ofSize: 15)
+            newInstructionLabel.textAlignment = .center
+            newInstructionLabel.translatesAutoresizingMaskIntoConstraints = false
+            instructionLabel = newInstructionLabel
+            view.addSubview(newInstructionLabel)
             NSLayoutConstraint.activate([
-                instructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                instructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+                newInstructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                newInstructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+            ])
+            // 주의 라벨
+            let cautionLabel = UILabel()
+            cautionLabel.text = "얼굴이 화면 밖으로 나가면 안됩니다"
+            cautionLabel.textColor = .systemYellow
+            cautionLabel.font = UIFont.systemFont(ofSize: 14)
+            cautionLabel.textAlignment = .center
+            cautionLabel.translatesAutoresizingMaskIntoConstraints = false
+            cautionLabel.tag = 9001
+            view.addSubview(cautionLabel)
+            NSLayoutConstraint.activate([
+                cautionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                cautionLabel.topAnchor.constraint(equalTo: newInstructionLabel.bottomAnchor, constant: 10)
+            ])
+        } else {
+            // 정면 등 다른 모드: 기존대로
+            let newInstructionLabel = UILabel()
+            newInstructionLabel.text = "얼굴 정면을 가이드 프레임 안에 맞춰주세요"
+            newInstructionLabel.textColor = .white
+            newInstructionLabel.font = UIFont.systemFont(ofSize: 15)
+            newInstructionLabel.textAlignment = .center
+            newInstructionLabel.translatesAutoresizingMaskIntoConstraints = false
+            instructionLabel = newInstructionLabel
+            view.addSubview(newInstructionLabel)
+            NSLayoutConstraint.activate([
+                newInstructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                newInstructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
             ])
         }
+        guideOverlayView.strokeColor = .red
     }
 
     // 카운트다운 후 사진 촬영 및 저장
@@ -487,14 +720,49 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
 
     // MARK: - ARSessionDelegate (AR 세션 델리게이트)
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        // 왼쪽 모드인 경우 ARFaceAnchor를 사용하여 실시간 위치 계산
-        if currentFacePosition == .left {
-            for anchor in frame.anchors {
-                if let faceAnchor = anchor as? ARFaceAnchor {
-                    DispatchQueue.main.async {
-                        self.updateCurrentYawVisualization(faceAnchor: faceAnchor)
+        // 좌측/우측 모드인 경우 ARFaceAnchor를 사용하여 실시간 위치 계산
+        if currentFacePosition == .left || currentFacePosition == .right {
+            let faceAnchor = frame.anchors.compactMap { $0 as? ARFaceAnchor }.first
+            if let faceAnchor = faceAnchor {
+                DispatchQueue.main.async {
+                    // 얼굴 중심 3D 좌표를 2D 화면 좌표로 변환
+                    let node = SCNNode()
+                    node.simdTransform = faceAnchor.transform
+                    let projectedPoint = self.arView.projectPoint(node.position)
+                    let projectedCGPoint = CGPoint(x: CGFloat(projectedPoint.x), y: CGFloat(projectedPoint.y))
+                    let center = CGPoint(x: self.cameraContainer.bounds.midX, y: self.cameraContainer.bounds.midY)
+                    let radius = min(self.cameraContainer.bounds.width, self.cameraContainer.bounds.height) / 2
+                    let dx = projectedCGPoint.x - center.x
+                    let dy = projectedCGPoint.y - center.y
+                    let distance = sqrt(dx*dx + dy*dy)
+                    let isInsideCircle = distance < radius * 0.9 // 여유값
+
+                    print("화면 내 위치 여부:", isInsideCircle)
+                    if !self.isFaceVisible || isInsideCircle != self.isFaceVisible {
+                        self.isFaceVisible = isInsideCircle
+                        if isInsideCircle {
+                            self.currentYawLayer?.isHidden = false
+                            self.targetYawLayer?.strokeColor = UIColor.white.withAlphaComponent(0.7).cgColor
+                        } else {
+                            self.currentYawLayer?.isHidden = true
+                            self.targetYawLayer?.strokeColor = UIColor.red.cgColor
+                        }
                     }
-                    break
+                    if isInsideCircle {
+                        if self.currentFacePosition == .left {
+                            self.updateCurrentYawVisualization(faceAnchor: faceAnchor)
+                        } else if self.currentFacePosition == .right {
+                            self.updateCurrentYawVisualizationRight(faceAnchor: faceAnchor)
+                        }
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    if self.isFaceVisible {
+                        self.isFaceVisible = false
+                    }
+                    self.currentYawLayer?.isHidden = true
+                    self.targetYawLayer?.strokeColor = UIColor.red.cgColor
                 }
             }
             return
