@@ -6,17 +6,15 @@
 //
 
 import UIKit
+import FirebaseAuth
+import FirebaseFirestore
 
 final class CheckInViewController: UIViewController {
 
-    // MARK: - 샘플 모델
-    
-    private let dummyStats: [StatItem] = [
-        StatItem(title: "오늘 체크인", value: "8", iconName: "checkmark.circle.fill", iconTintColor: .systemGreen),
-        StatItem(title: "오늘 체크아웃", value: "5", iconName: "checkmark.circle.fill", iconTintColor: .systemBlue),
-        StatItem(title: "체크인 대기", value: "3", iconName: "clock.fill", iconTintColor: .systemOrange),
-        StatItem(title: "체크아웃 대기", value: "2", iconName: "clock.fill", iconTintColor: .systemPurple)
-    ]
+    // MARK: - 통계 데이터 (Firestore 실시간)
+    private var statItems: [StatItem] = []
+    // 통계 뷰와 valueLabel을 함께 저장하여 값만 갱신할 수 있도록
+    private var statViews: [(container: UIView, valueLabel: UILabel)] = []
 
     private let dummyRecents: [RecentRecognition] = [
         RecentRecognition(guestName: "김철수", roomNumber: "객실 101", mode: .checkin, time: "14:23"),
@@ -37,7 +35,6 @@ final class CheckInViewController: UIViewController {
 
     // 2) Stat Grid: 2x2 그리드
     private let statsContainer = UIView()
-    private var statViews: [UIView] = []
 
     // 3) Recent Recognition Section: 테이블뷰만 스크롤
     private let recentHeaderLabel = UILabel()
@@ -53,6 +50,8 @@ final class CheckInViewController: UIViewController {
         configureGuestCard()
         configureStatsGrid()
         configureRecentSection()
+        // Firestore에서 통계 실시간 집계
+        fetchStats()
     }
 
     // MARK: - 네비게이션 바 설정
@@ -131,7 +130,6 @@ final class CheckInViewController: UIViewController {
             window.rootViewController = nav
             window.makeKeyAndVisible()
         }
-        // navigationController?.pushViewController(guestCameraVC, animated: true)
     }
 
     // MARK: - 2) Stats Grid 구성 (2x2)
@@ -154,9 +152,23 @@ final class CheckInViewController: UIViewController {
         bottomRow.distribution = .fillEqually
         bottomRow.spacing = 12
 
-        for (index, stat) in dummyStats.enumerated() {
-            let statView = createSingleStatView(item: stat)
-            statViews.append(statView)
+        // 기존 statViews 제거
+        statViews.removeAll()
+        // statItems가 비어있으면 placeholder로 4개 0을 보여줌
+        let statsToShow: [StatItem]
+        if statItems.isEmpty {
+            statsToShow = [
+                StatItem(title: "오늘 체크인", value: "0", iconName: "checkmark.circle.fill", iconTintColor: .systemGreen),
+                StatItem(title: "오늘 체크아웃", value: "0", iconName: "checkmark.circle.fill", iconTintColor: .systemBlue),
+                StatItem(title: "체크인 대기", value: "0", iconName: "clock.fill", iconTintColor: .systemOrange),
+                StatItem(title: "체크아웃 대기", value: "0", iconName: "clock.fill", iconTintColor: .systemPurple)
+            ]
+        } else {
+            statsToShow = statItems
+        }
+        for (index, stat) in statsToShow.enumerated() {
+            let (statView, valueLabel) = createSingleStatView(item: stat)
+            statViews.append((statView, valueLabel))
             if index < 2 {
                 topRow.addArrangedSubview(statView)
             } else {
@@ -187,7 +199,8 @@ final class CheckInViewController: UIViewController {
         ])
     }
 
-    private func createSingleStatView(item: StatItem) -> UIView {
+    // UILabel 반환형 추가, (UIView, UILabel) 튜플 반환
+    private func createSingleStatView(item: StatItem) -> (UIView, UILabel) {
         let container = UIView()
         container.translatesAutoresizingMaskIntoConstraints = false
         container.backgroundColor = .secondarySystemBackground
@@ -226,8 +239,60 @@ final class CheckInViewController: UIViewController {
             textStack.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
             textStack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12)
         ])
+        // valueLabel을 반환하여 나중에 값만 갱신 가능
+        return (container, valueLabel)
+    }
 
-        return container
+    // Firestore에서 오늘 체크인, 체크인 대기, 체크아웃, 체크아웃 대기 실시간 집계
+    private func fetchStats() {
+        guard let hostId = Auth.auth().currentUser?.uid else { return }
+        let db = Firestore.firestore()
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: Date())
+        let startOfTomorrow = calendar.date(byAdding: .day, value: 1, to: startOfToday)!
+
+        // 오늘 체크인/체크인 대기
+        db.collection("reserves")
+            .whereField("hostId", isEqualTo: hostId)
+            .whereField("startDate", isGreaterThanOrEqualTo: Timestamp(date: startOfToday))
+            .whereField("startDate", isLessThan: Timestamp(date: startOfTomorrow))
+            .getDocuments { snapshot, error in
+                guard let docs = snapshot?.documents else { return }
+
+                let checkInCount = docs.filter { ($0.data()["checkIn"] as? Bool) == true }.count
+                let checkInWaitCount = docs.filter { ($0.data()["checkIn"] as? Bool) != true }.count
+
+                // 오늘 체크아웃/체크아웃 대기
+                db.collection("reserves")
+                    .whereField("hostId", isEqualTo: hostId)
+                    .whereField("endDate", isGreaterThanOrEqualTo: Timestamp(date: startOfToday))
+                    .whereField("endDate", isLessThan: Timestamp(date: startOfTomorrow))
+                    .getDocuments { snapshot2, error2 in
+                        guard let docs2 = snapshot2?.documents else { return }
+                        let checkOutCount = docs2.filter { ($0.data()["checkOut"] as? Bool) == true }.count
+                        let checkOutWaitCount = docs2.filter { ($0.data()["checkOut"] as? Bool) != true }.count
+
+                        self.statItems = [
+                            StatItem(title: "오늘 체크인", value: "\(checkInCount)", iconName: "checkmark.circle.fill", iconTintColor: .systemGreen),
+                            StatItem(title: "오늘 체크아웃", value: "\(checkOutCount)", iconName: "checkmark.circle.fill", iconTintColor: .systemBlue),
+                            StatItem(title: "체크인 대기", value: "\(checkInWaitCount)", iconName: "clock.fill", iconTintColor: .systemOrange),
+                            StatItem(title: "체크아웃 대기", value: "\(checkOutWaitCount)", iconName: "clock.fill", iconTintColor: .systemPurple)
+                        ]
+                        self.updateStatsGrid()
+                    }
+            }
+    }
+
+    // 통계 값이 바뀔 때마다 UI 갱신
+    private func updateStatsGrid() {
+        // UI 스레드에서 실행
+        DispatchQueue.main.async {
+            for (index, tuple) in self.statViews.enumerated() {
+                if index < self.statItems.count {
+                    tuple.valueLabel.text = self.statItems[index].value
+                }
+            }
+        }
     }
 
     // MARK: - 3) Recent Recognition Section 구성
