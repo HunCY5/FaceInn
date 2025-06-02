@@ -13,6 +13,9 @@ import AVFoundation
 
 final class ProfileViewController: UIViewController {
 
+    // 반복 탭으로 인한 중복 이동 방지용 플래그
+    private var isNavigatingToFaceCapture = false
+
     private let profileView = ProfileView()
 
     override func loadView() {
@@ -33,6 +36,8 @@ final class ProfileViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         updateView()
+        // 뒤로 돌아오면 재탐색 가능하도록 플래그 해제
+        isNavigatingToFaceCapture = false
     }
 
     // 로그인 상태에 따라 UI 업데이트
@@ -59,6 +64,8 @@ final class ProfileViewController: UIViewController {
     }
     // 페이스 아이디 등록/삭제 버튼 액션
     @objc private func didTapFaceIDAction() {
+        // 이미 이동 중이면 추가 실행하지 않음
+        guard !isNavigatingToFaceCapture else { return }
         guard let user = Auth.auth().currentUser else { return }
         let db = Firestore.firestore()
         db.collection("users").document(user.uid).getDocument { snapshot, error in
@@ -120,14 +127,18 @@ final class ProfileViewController: UIViewController {
     }
     
     @objc private func didTapFaceIDRegister() {
+        // 이미 이동 중이면 추가 실행하지 않음
+        guard !isNavigatingToFaceCapture else { return }
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
+            isNavigatingToFaceCapture = true
             let vc = FaceCaptureViewController()
             navigationController?.pushViewController(vc, animated: true)
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 DispatchQueue.main.async {
                     if granted {
+                        self.isNavigatingToFaceCapture = true
                         let vc = FaceCaptureViewController()
                         self.navigationController?.pushViewController(vc, animated: true)
                     } else {

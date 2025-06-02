@@ -39,19 +39,13 @@ final class FaceGuideOverlayView: UIView {
     var currentPosition: FacePosition = .front {
         didSet {
             setNeedsDisplay()
-            updateGuidanceText()
         }
     }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .clear
-        addSubview(guidanceLabel)
-        NSLayoutConstraint.activate([
-            guidanceLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            guidanceLabel.topAnchor.constraint(equalTo: topAnchor, constant: 80)
-        ])
-        updateGuidanceText()
+        // Remove guidanceLabel from overlay
         isUserInteractionEnabled = false
     }
 
@@ -62,28 +56,47 @@ final class FaceGuideOverlayView: UIView {
     // 얼굴 가이드 이미지를 현재 위치에 따라 해당하는 이미지와 크기로 화면에 그림
     override func draw(_ rect: CGRect) {
         guard let context = UIGraphicsGetCurrentContext() else { return }
-
         context.clear(rect)
 
+        // 반투명 검정 배경
+        context.setFillColor(UIColor.black.withAlphaComponent(0.5).cgColor)
+        context.fill(rect)
+
+        // 중앙 원형 투명 구멍
+        let radius = min(rect.width, rect.height) / 2
+        let circlePath = UIBezierPath(
+            ovalIn: CGRect(
+                x: rect.midX - radius,
+                y: rect.midY - radius,
+                width: radius * 2,
+                height: radius * 2
+            )
+        )
+        context.addPath(circlePath.cgPath)
+        context.setBlendMode(.clear)
+        context.fillPath()
+        context.setBlendMode(.normal)
+
+        // 가이드 이미지 크기: 컨테이너 크기에 대한 비율
+        let guideWidth = rect.width * 0.5
+        let guideHeight = rect.height * 0.75
+        let imageSize = CGSize(width: guideWidth, height: guideHeight)
+
+        // 이미지 이름 선택
         let imageName: String
-        let imageSize: CGSize
-
         let isDetected = strokeColor == .green
-
         switch currentPosition {
         case .front:
             imageName = isDetected ? "guide_front_green" : "guide_front_red"
-            imageSize = CGSize(width: 300, height: 360)
         case .left:
             imageName = isDetected ? "guide_right_green" : "guide_right_red"
-            imageSize = CGSize(width: 260, height: 312)
         case .right:
             imageName = isDetected ? "guide_left_green" : "guide_left_red"
-            imageSize = CGSize(width: 260, height: 312)
         }
 
         guard let image = UIImage(named: imageName) else { return }
 
+        // 이미지 위치 계산
         let imageRect: CGRect
         switch currentPosition {
         case .front:
@@ -95,33 +108,35 @@ final class FaceGuideOverlayView: UIView {
             )
         case .left:
             imageRect = CGRect(
-                x: rect.width * 0.15,
+                x: rect.width * 0.2,
                 y: (rect.height - imageSize.height) / 2,
                 width: imageSize.width,
                 height: imageSize.height
             )
         case .right:
             imageRect = CGRect(
-                x: rect.width * 0.85 - imageSize.width,
+                x: rect.width * 0.8 - imageSize.width,
                 y: (rect.height - imageSize.height) / 2,
                 width: imageSize.width,
                 height: imageSize.height
             )
         }
 
-        image.draw(in: imageRect, blendMode: .normal, alpha: 1.0)
+        // 가이드 이미지 렌더링
+        image.draw(in: imageRect)
+
+        // 외곽 원형 테두리
+        context.setStrokeColor(strokeColor.cgColor)
+        context.setLineWidth(4)
+        context.addEllipse(in: CGRect(
+            x: rect.midX - radius,
+            y: rect.midY - radius,
+            width: radius * 2,
+            height: radius * 2
+        ))
+        context.strokePath()
     }
-    // 현재 얼굴 위치에 따라 상단에 표시되는 안내 문구를 업데이트
-    private func updateGuidanceText() {
-        switch currentPosition {
-        case .front:
-            guidanceLabel.text = "얼굴 정면을 보여주세요"
-        case .left:
-            guidanceLabel.text = "얼굴 우측을 보여주세요"
-        case .right:
-            guidanceLabel.text = "얼굴 좌측을 보여주세요"
-        }
-    }
+    // 안내 문구 레이블 제거됨 (FaceCaptureViewController에서 라벨 직접 추가)
 }
 
 extension FaceGuideOverlayView.FacePosition: CustomStringConvertible {
@@ -133,3 +148,4 @@ extension FaceGuideOverlayView.FacePosition: CustomStringConvertible {
         }
     }
 }
+

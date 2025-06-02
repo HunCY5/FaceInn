@@ -30,6 +30,8 @@ final class SignUpViewController: UIViewController {
 
         // 입력 값이 변경될 때마다 유효성 확인
         [signUpView.nameTextField,
+         signUpView.birthdayTextField,
+         signUpView.phoneTextField,
          signUpView.emailTextField,
          signUpView.passwordTextField,
          signUpView.confirmPasswordTextField
@@ -41,6 +43,7 @@ final class SignUpViewController: UIViewController {
     @objc private func textFieldChanged() {
         let name = signUpView.nameTextField.text ?? ""
         let birthday = signUpView.birthdayString
+        let phone = signUpView.phoneTextField.text ?? ""
         let email = signUpView.emailTextField.text ?? ""
         let password = signUpView.passwordTextField.text ?? ""
         let confirm = signUpView.confirmPasswordTextField.text ?? ""
@@ -59,6 +62,9 @@ final class SignUpViewController: UIViewController {
 
         let isFormValid = !name.isEmpty &&
                           !birthday.isEmpty &&
+                          phone.count >= 10 &&
+                          phone.count <= 11 &&
+                          phone.allSatisfy { $0.isNumber } &&
                           model.isValidEmail(email) &&
                           password.count >= 6 &&
                           password == confirm &&
@@ -97,10 +103,11 @@ final class SignUpViewController: UIViewController {
     @objc private func didTapSignUp() {
         let name = signUpView.nameTextField.text ?? ""
         let birthday = signUpView.birthdayString
+        let phone = signUpView.phoneTextField.text ?? ""
         let email = signUpView.emailTextField.text ?? ""
         let password = signUpView.passwordTextField.text ?? ""
 
-        model.signUp(email: email, password: password, realName: name, birthday: birthday) { [weak self] result in
+        model.signUp(email: email, password: password, realName: name, birthday: birthday, phone: phone) { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
                 case .success:
@@ -123,3 +130,4 @@ final class SignUpViewController: UIViewController {
 #Preview {
     SignUpViewController()
 }
+

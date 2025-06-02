@@ -34,6 +34,7 @@ final class SignUpModel {
                 password: String,
                 realName: String,
                 birthday: String?,
+                phone: String,
                 completion: @escaping (Result<Void, Error>) -> Void) {
         Auth.auth().createUser(withEmail: email, password: password) { result, error in
             if let error = error {
@@ -47,7 +48,7 @@ final class SignUpModel {
                 return
             }
 
-            self.saveUserData(uid: uid, email: email, name: realName, birthday: birthday, completion: completion)
+            self.saveUserData(uid: uid, email: email, name: realName, birthday: birthday, phone: phone, completion: completion)
         }
     }
 
@@ -55,13 +56,15 @@ final class SignUpModel {
                               email: String,
                               name: String,
                               birthday: String?,
+                              phone: String,
                               completion: @escaping (Result<Void, Error>) -> Void) {
         var userData: [String: Any] = [
             "email": email,
             "name": name,
             "loginStatus": false,
             "type": "guest",
-            "createdAt": Timestamp(date: Date())
+            "createdAt": Timestamp(date: Date()),
+            "phone": phone
         ]
         if let birthday = birthday {
             userData["birthday"] = birthday
