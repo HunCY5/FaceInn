@@ -819,8 +819,11 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                           let leftVec = userData["left_vector"] as? [Float],
                           let rightVec = userData["right_vector"] as? [Float] else {
                         print("  → userID \(userID) missing vector fields")
+                        
                         return
                     }
+                    
+                    
                     
                     print("Comparing vectors for userID: \(userID), reserveID: \(reserveID)")
                     // Compare each vector distance
@@ -844,13 +847,19 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                     if distFront < threshold && distLeft < threshold && distRight < threshold {
                         print("  → Vectors matched for userID \(userID), reserveID \(reserveID)")
                         DispatchQueue.main.async {
-                            self.delegate?.guestFaceRecognitionDidComplete(
-                                reserveID: reserveID,
-                                userID: userID,
-                                userData: userData,
-                                isCheckIn: self.recognitionType == .checkIn
-                            )
-                            self.dismiss(animated: true)
+                            // ReserveInfoViewController로 직접 push 및 데이터 전달
+                            let reserveInfoVC = ReserveInfoViewController()
+                            reserveInfoVC.reserveID = reserveID
+                            reserveInfoVC.userID = userID
+                            reserveInfoVC.userData = userData
+                            reserveInfoVC.isCheckIn = (self.recognitionType == .checkIn)
+                            reserveInfoVC.reserveData = data
+                            if let nav = self.navigationController {
+                                nav.pushViewController(reserveInfoVC, animated: true)
+                            } else {
+                                self.present(reserveInfoVC, animated: true)
+                            }
+                            // self.dismiss(animated: true) // push 방식에서는 필요 없음
                         }
                     } else {
                         print("  → Vectors did NOT match for userID \(userID)")
