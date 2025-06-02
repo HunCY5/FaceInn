@@ -295,6 +295,12 @@ final class HomeViewController: UIViewController {
                     return false
                 }
             }
+            let selectedLocation = UserDefaults.standard.string(forKey: "selectedLocation") ?? "위치"
+            if selectedLocation != "위치" {
+                self.filteredAccommodations = self.filteredAccommodations.filter {
+                    $0.location.localizedCaseInsensitiveContains(selectedLocation)
+                }
+            }
             DispatchQueue.main.async {
                 let section = IndexSet(integer: 0)
                 self.collectionView.reloadSections(section)
