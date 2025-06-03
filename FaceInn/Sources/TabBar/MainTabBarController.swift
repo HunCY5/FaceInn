@@ -25,12 +25,12 @@ final class MainTabBarController: UITabBarController {
         let tripsVC = UINavigationController(rootViewController: TripsViewController())
         tripsVC.tabBarItem = UITabBarItem(title: "여행", image: UIImage(systemName: "airplane"), tag: 2)
 
-        let messageVC = UINavigationController(rootViewController: MessageViewController())
-        messageVC.tabBarItem = UITabBarItem(title: "메시지", image: UIImage(systemName: "message"), tag: 3)
+//        let messageVC = UINavigationController(rootViewController: MessageViewController())
+//        messageVC.tabBarItem = UITabBarItem(title: "메시지", image: UIImage(systemName: "message"), tag: 3)
 
         let profileVC = UINavigationController(rootViewController: ProfileViewController())
-        profileVC.tabBarItem = UITabBarItem(title: "프로필", image: UIImage(systemName: "person"), tag: 4)
+        profileVC.tabBarItem = UITabBarItem(title: "프로필", image: UIImage(systemName: "person"), tag: 3)
 
-        viewControllers = [homeVC, wishlistVC, tripsVC, messageVC, profileVC]
+        viewControllers = [homeVC, wishlistVC, tripsVC/*, messageVC*/, profileVC]
     }
 }
