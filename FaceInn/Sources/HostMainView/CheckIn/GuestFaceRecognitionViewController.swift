@@ -788,7 +788,27 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
             }
             guard let docs = snapshot?.documents, !docs.isEmpty else {
                 print("No matching reserve documents found.")
-                self.showAlert(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.")
+                // 카메라 및 AR 세션 중지
+                DispatchQueue.main.async {
+                    self.arView.session.pause()
+                    self.arView.removeFromSuperview()
+                }
+                // 알림 생성 및 이전 화면 복귀 처리
+                let alert = UIAlertController(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
+                    _ = self.navigationController?.popViewController(animated: true)
+                })
+                DispatchQueue.main.async {
+                    self.present(alert, animated: true)
+                }
+                // 10초 후 자동으로 이전 화면 복귀
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                    if self.presentedViewController === alert {
+                        alert.dismiss(animated: true) {
+                            _ = self.navigationController?.popViewController(animated: true)
+                        }
+                    }
+                }
                 return
             }
             
@@ -802,13 +822,13 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                 let data = doc.data()
                 let reserveID = doc.documentID
                 print("Processing reserveID: \(reserveID)")
-                
+
                 guard let userID = data["userId"] as? String else {
                     print("  → reserveID \(reserveID) has no userID field")
                     continue
                 }
                 print("  → Found userID: \(userID)")
-                
+
                 db.collection("users").document(userID).getDocument { userSnap, err in
                     if let err = err {
                         print("  → 유저 데이터 불러오기 실패 for userID \(userID): \(err.localizedDescription)")
@@ -819,35 +839,33 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                           let leftVec = userData["left_vector"] as? [Float],
                           let rightVec = userData["right_vector"] as? [Float] else {
                         print("  → userID \(userID) missing vector fields")
-                        
                         return
                     }
-                    
-                    
-                    
-                    print("Comparing vectors for userID: \(userID), reserveID: \(reserveID)")
-                    // Compare each vector distance
-                    let threshold: Float = 0.6 // adjust as needed
-                    func l2(_ a: [Float], _ b: [Float]) -> Float {
-                        zip(a, b).map { ($0 - $1) * ($0 - $1) }.reduce(0, +)
-                    }
+
                     guard let gvFront = guestVectors[.front],
                           let gvLeft = guestVectors[.left],
                           let gvRight = guestVectors[.right] else {
                         print("  → guestVectors missing one of front/left/right")
                         return
                     }
-                    
-                    let distFront = l2(gvFront, frontVec)
-                    let distLeft  = l2(gvLeft,  leftVec)
-                    let distRight = l2(gvRight, rightVec)
-                    print("  → Distances - front: \(distFront), left: \(distLeft), right: \(distRight), threshold: \(threshold)")
-                    
-                    // If all distances below threshold
-                    if distFront < threshold && distLeft < threshold && distRight < threshold {
-                        print("  → Vectors matched for userID \(userID), reserveID \(reserveID)")
+
+                    // -- 코사인 유사도 --
+                    func cosine(_ a: [Float], _ b: [Float]) -> Float {
+                        let dotProduct = zip(a, b).map(*).reduce(0, +)
+                        let magnitudeA = sqrt(zip(a, a).map(*).reduce(0, +))
+                        let magnitudeB = sqrt(zip(b, b).map(*).reduce(0, +))
+                        return dotProduct / (magnitudeA * magnitudeB)
+                    }
+
+                    let cosFront = cosine(gvFront, frontVec)
+                    let cosLeft  = cosine(gvLeft,  leftVec)
+                    let cosRight = cosine(gvRight, rightVec)
+                    print("Cosine similarities → front: \(cosFront), left: \(cosLeft), right: \(cosRight)")
+
+                    let thresholdCos: Float = 0.55 // 기준 값
+                    if cosFront > thresholdCos && cosLeft > thresholdCos && cosRight > thresholdCos {
+                        print("✅ Cosine match success for userID \(userID), reserveID \(reserveID)")
                         DispatchQueue.main.async {
-                            // ReserveInfoViewController로 직접 push 및 데이터 전달
                             let reserveInfoVC = ReserveInfoViewController()
                             reserveInfoVC.reserveID = reserveID
                             reserveInfoVC.userID = userID
@@ -859,23 +877,21 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                             } else {
                                 self.present(reserveInfoVC, animated: true)
                             }
-                            // self.dismiss(animated: true) // push 방식에서는 필요 없음
                         }
                     } else {
-                        print("  → Vectors did NOT match for userID \(userID)")
+                        print("❌ Cosine match failure for userID \(userID), reserveID \(reserveID)")
                     }
                 }
             }
         }
     }
-    
-    // MARK: - 도우미 메서드
-    // 알림 표시
+
+    // MARK: - showAlert
     private func showAlert(title: String, message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
-            self.dismiss(animated: true)
-        })
-        present(alert, animated: true)
+        DispatchQueue.main.async {
+            let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "확인", style: .default))
+            self.present(alert, animated: true)
+        }
     }
 }
