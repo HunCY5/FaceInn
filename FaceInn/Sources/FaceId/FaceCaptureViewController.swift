@@ -791,15 +791,10 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                                      y: view.bounds.midY - 140,
                                      width: 300,
                                      height: 280)
-        case .left:
-            guideRectInView = CGRect(x: view.bounds.midX - 200,
+        default:
+            guideRectInView = CGRect(x: view.bounds.midX - 150,
                                      y: view.bounds.midY - 140,
-                                     width: 310,
-                                     height: 280)
-        case .right:
-            guideRectInView = CGRect(x: view.bounds.midX - 110,
-                                     y: view.bounds.midY - 140,
-                                     width: 310,
+                                     width: 300,
                                      height: 280)
         }
 

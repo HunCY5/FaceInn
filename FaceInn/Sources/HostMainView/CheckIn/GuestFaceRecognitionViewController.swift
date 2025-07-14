@@ -70,6 +70,10 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         tabBarController?.tabBar.isHidden = true
+        // AR 세션 재시작
+        if let config = arView.session.configuration {
+            arView.session.run(config, options: [.resetTracking, .removeExistingAnchors])
+        }
     }
 
     // 화면이 사라질 때 탭바 보이기
@@ -381,9 +385,16 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                 Int(self.view.bounds.width),
                 Int(self.view.bounds.height)
             )
-            // UIKit의 guideRect를 Vision의 정규화된 regionOfInterest 좌표로 변환
-            let guideRect = CGRect(x: self.view.bounds.midX - 150, y: self.view.bounds.midY - 140, width: 300, height: 280)
-            let intersection = guideRect.intersection(faceBox)
+
+            // 정면 얼굴 인식 영역
+            var guideRectInView: CGRect
+            switch self.currentFacePosition {
+            case .front:
+                guideRectInView = CGRect(x: self.view.bounds.midX - 150, y: self.view.bounds.midY - 140, width: 300, height: 280)
+            default:
+                guideRectInView = CGRect(x: self.view.bounds.midX - 150, y: self.view.bounds.midY - 140, width: 300, height: 280)
+            }
+            let intersection = guideRectInView.intersection(faceBox)
             let intersectionArea = intersection.width * intersection.height
             let faceArea = faceBox.width * faceBox.height
             let heightRatio = intersection.height / faceBox.height
@@ -790,6 +801,10 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                 print("No matching reserve documents found.")
                 // 카메라 및 AR 세션 중지
                 DispatchQueue.main.async {
+                    self.countdownTimer?.invalidate()
+                    self.countdownTimer = nil
+                    self.countdownLabel?.removeFromSuperview()
+                    self.instructionLabel?.removeFromSuperview()
                     self.arView.session.pause()
                     self.arView.removeFromSuperview()
                 }
