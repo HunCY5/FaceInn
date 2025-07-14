@@ -158,7 +158,7 @@ final class CheckInViewController: UIViewController {
 
         // 타이틀 레이블
         guestTitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        guestTitleLabel.text = "게스트 체크인"
+        guestTitleLabel.text = "게스트 체크인/체크아웃"
         guestTitleLabel.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
 
         // 서브타이틀 레이블
@@ -170,7 +170,7 @@ final class CheckInViewController: UIViewController {
 
         // 버튼
         openGuestButton.translatesAutoresizingMaskIntoConstraints = false
-        openGuestButton.setTitle("📷  게스트 체크인 화면 열기", for: .normal)
+        openGuestButton.setTitle("📷 화면으로 이동", for: .normal)
         openGuestButton.setTitleColor(.white, for: .normal)
         openGuestButton.backgroundColor = UIColor(red: 46/255, green: 173/255, blue: 83/255, alpha: 1) // #2FAF53
         openGuestButton.layer.cornerRadius = 8
