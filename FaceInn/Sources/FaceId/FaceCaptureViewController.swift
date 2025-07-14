@@ -526,6 +526,16 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
         }
     }
 
+    // 정면 가이드 프레임 계산 프로퍼티
+    private var frontGuideRect: CGRect {
+        CGRect(
+            x: view.bounds.midX - 150,
+            y: view.bounds.midY - 140,
+            width: 300,
+            height: 280
+        )
+    }
+
     // 모든 얼굴 이미지에 대해 임베딩 벡터를 추출 후 Firestore에 일괄 저장
     private func saveAllVectors() {
         guard let uid = Auth.auth().currentUser?.uid else { return }
@@ -784,19 +794,10 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
     // Vision 얼굴 검증 로직을 ARKit 프레임에 맞게 분리
     private func validateFrontFace(on pixelBuffer: CVPixelBuffer) {
         // 현재 얼굴 위치에 따라 guideRect 정의 (UIKit 좌표계)
-        let guideRectInView: CGRect
-        switch currentFacePosition {
-        case .front:
-            guideRectInView = CGRect(x: view.bounds.midX - 150,
+        let guideRectInView = CGRect(x: view.bounds.midX - 150,
                                      y: view.bounds.midY - 140,
                                      width: 300,
                                      height: 280)
-        default:
-            guideRectInView = CGRect(x: view.bounds.midX - 150,
-                                     y: view.bounds.midY - 140,
-                                     width: 300,
-                                     height: 280)
-        }
 
 
         // UIKit의 guideRect를 Vision의 정규화된 regionOfInterest 좌표로 변환
@@ -832,21 +833,9 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                         Int(self.view.bounds.height)
                     )
 
-                    let guideRect: CGRect
-                    switch self.currentFacePosition {
-                    case .front:
-                        guideRect = CGRect(x: self.view.bounds.midX - 150,
+                    let guideRect = CGRect(x: self.view.bounds.midX - 150,
                                            y: self.view.bounds.midY - 140,
                                            width: 300, height: 280)
-                    case .left:
-                        guideRect = CGRect(x: self.view.bounds.midX - 200,
-                                           y: self.view.bounds.midY - 140,
-                                           width: 310, height: 280)
-                    case .right:
-                        guideRect = CGRect(x: self.view.bounds.midX - 110,
-                                           y: self.view.bounds.midY - 140,
-                                           width: 310, height: 280)
-                    }
 
                     func convertLandmarkPoint(_ pt: CGPoint) -> CGPoint {
                         let x = faceRect.origin.x + pt.x * faceRect.width
@@ -1018,21 +1007,9 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                             Int(self.view.bounds.height)
                         )
 
-                        let guideRect: CGRect
-                        switch self.currentFacePosition {
-                        case .front:
-                            guideRect = CGRect(x: self.view.bounds.midX - 150,
+                        let guideRect = CGRect(x: self.view.bounds.midX - 150,
                                                y: self.view.bounds.midY - 140,
                                                width: 280, height: 280)
-                        case .left:
-                            guideRect = CGRect(x: self.view.bounds.midX - 200,
-                                               y: self.view.bounds.midY - 140,
-                                               width: 310, height: 280)
-                        case .right:
-                            guideRect = CGRect(x: self.view.bounds.midX - 110,
-                                               y: self.view.bounds.midY - 140,
-                                               width: 310, height: 280)
-                        }
 
                         // 위치에 따라 다른 임계값 사용 (정면)
                         let intersection = guideRect.intersection(faceRect)

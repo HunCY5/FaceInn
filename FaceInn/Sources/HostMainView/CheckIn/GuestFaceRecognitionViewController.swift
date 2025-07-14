@@ -49,6 +49,16 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
     private var countdownCount = 3
     
     private let processor: FaceProcessor? = FaceProcessor()
+
+    // 정면 가이드 프레임 계산 프로퍼티
+    private var frontGuideRect: CGRect {
+        CGRect(
+            x: view.bounds.midX - 150,
+            y: view.bounds.midY - 140,
+            width: 300,
+            height: 280
+        )
+    }
     
     // MARK: - 생명 주기 메서드
     enum RecognitionType {
@@ -387,13 +397,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
             )
 
             // 정면 얼굴 인식 영역
-            var guideRectInView: CGRect
-            switch self.currentFacePosition {
-            case .front:
-                guideRectInView = CGRect(x: self.view.bounds.midX - 150, y: self.view.bounds.midY - 140, width: 300, height: 280)
-            default:
-                guideRectInView = CGRect(x: self.view.bounds.midX - 150, y: self.view.bounds.midY - 140, width: 300, height: 280)
-            }
+            let guideRectInView = CGRect(x: self.view.bounds.midX - 150, y: self.view.bounds.midY - 140, width: 300, height: 280)
             let intersection = guideRectInView.intersection(faceBox)
             let intersectionArea = intersection.width * intersection.height
             let faceArea = faceBox.width * faceBox.height
