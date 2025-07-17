@@ -1,4 +1,6 @@
 # FaceInn
+앱 소개 링크: https://sepia-chili-4c9.notion.site/FaceInn-233bd8a384518067997ad2687a6e7112?pvs=143
+
 ## 프로젝트 구조
 FaceInn/
 ├── Tuist/                
