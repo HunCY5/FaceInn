@@ -50,8 +50,14 @@ let project = Project(
           ]
         ]
       ),
-      sources: ["FaceInn/Sources/**"],
-      resources: ["FaceInn/Resources/**", "FaceInn/GoogleService-Info.plist"],
+      sources: [
+        "FaceInn/Sources/**/*.swift",
+        "FaceInn/Sources/MobileFaceNet.mlmodel"
+      ],
+      resources: [
+        "FaceInn/Resources/**",
+        "FaceInn/GoogleService-Info.plist"
+      ],
       dependencies: [
         .package(product: "FirebaseAnalytics"),
         .package(product: "FirebaseAuth"),
