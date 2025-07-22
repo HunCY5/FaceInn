@@ -376,60 +376,9 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
     
     // 정면 얼굴 유효성 검사(Vision 사용)
     private func validateFrontFace(on pixelBuffer: CVPixelBuffer) {
-        let orientation: CGImagePropertyOrientation = .leftMirrored
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation, options: [:])
-        let request = VNDetectFaceLandmarksRequest { [weak self] req, error in
-            guard let self = self else { return }
-            guard let observations = req.results as? [VNFaceObservation], let obs = observations.first else {
-                DispatchQueue.main.async {
-                    self.guideOverlayView.strokeColor = .red
-                    self.isFaceDetected = false
-                    if self.isCountingDownActive, self.countdownTimer != nil {
-                        self.resetCountdown()
-                    }
-                }
-                return
-            }
-            let faceBox = VNImageRectForNormalizedRect(
-                obs.boundingBox,
-                Int(self.view.bounds.width),
-                Int(self.view.bounds.height)
-            )
-
-            // 정면 얼굴 인식 영역
-            let guideRectInView = CGRect(x: self.view.bounds.midX - 150, y: self.view.bounds.midY - 140, width: 300, height: 280)
-            let intersection = guideRectInView.intersection(faceBox)
-            let intersectionArea = intersection.width * intersection.height
-            let faceArea = faceBox.width * faceBox.height
-            let heightRatio = intersection.height / faceBox.height
-            let areaThreshold: CGFloat = 0.65
-            let heightThreshold: CGFloat = 0.65
-            let isWithinGuide = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
-            let isWithinHeight = heightRatio > heightThreshold
-            let minWidth: CGFloat = 140
-            let minHeight: CGFloat = 90
-            let isLargeEnough = faceBox.width >= minWidth && faceBox.height >= minHeight
-            let isValid = isWithinGuide && isWithinHeight && isLargeEnough
-
-            DispatchQueue.main.async {
-                self.guideOverlayView.strokeColor = isValid ? .green : .red
-                let prev = self.isFaceDetected
-                self.isFaceDetected = isValid
-
-                if self.isCountingDownActive {
-                    if self.isFaceDetected {
-                        if self.countdownTimer == nil {
-                            self.startCountdown()
-                        }
-                    } else {
-                        if self.countdownTimer != nil {
-                            self.resetCountdown()
-                        }
-                    }
-                }
-            }
-        }
-        try? handler.perform([request])
+        // 사각형 기반 얼굴 검출로 대체 (Guest)
+        performRectangleRequest(on: pixelBuffer)
+        return
     }
     
     // MARK: - 촬영 및 진행
@@ -881,7 +830,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                     let cosRight = cosine(gvRight, rightVec)
                     print("Cosine similarities → front: \(cosFront), left: \(cosLeft), right: \(cosRight)")
 
-                    let thresholdCos: Float = 0.55 // 기준 값
+                    let thresholdCos: Float = 0.75 // 기준 값
                     if cosFront > thresholdCos && cosLeft > thresholdCos && cosRight > thresholdCos {
                         print("✅ Cosine match success for userID \(userID), reserveID \(reserveID)")
                         DispatchQueue.main.async {
@@ -912,5 +861,39 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
             alert.addAction(UIAlertAction(title: "확인", style: .default))
             self.present(alert, animated: true)
         }
+    }
+    // Fallback: Vision 직사각형 검출 요청 공통 처리 (Guest 모드)
+    private func performRectangleRequest(on pixelBuffer: CVPixelBuffer) {
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .leftMirrored, options: [:])
+        let rectRequest = VNDetectFaceRectanglesRequest { [weak self] request, error in
+            guard let self = self else { return }
+            let faceRect = VNImageRectForNormalizedRect(
+                (request.results as? [VNFaceObservation])?.first?.boundingBox ?? .zero,
+                Int(self.view.bounds.width),
+                Int(self.view.bounds.height)
+            )
+            let guideRect = self.frontGuideRect
+            let intersection = guideRect.intersection(faceRect)
+            let intersectionArea = intersection.width * intersection.height
+            let faceArea = faceRect.width * faceRect.height
+            let heightRatio = intersection.height / faceRect.height
+            let isValid = faceArea > 0 &&
+                          (intersectionArea / faceArea > 0.65) &&
+                          (heightRatio > 0.65) &&
+                          faceRect.width >= 140 &&
+                          faceRect.height >= 90
+            DispatchQueue.main.async {
+                self.guideOverlayView.strokeColor = isValid ? .green : .red
+                self.isFaceDetected = isValid
+                if self.isCountingDownActive {
+                    if isValid && self.countdownTimer == nil {
+                        self.startCountdown()
+                    } else if !isValid && self.countdownTimer != nil {
+                        self.resetCountdown()
+                    }
+                }
+            }
+        }
+        try? handler.perform([rectRequest])
     }
 }
