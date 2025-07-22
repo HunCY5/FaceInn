@@ -751,40 +751,37 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                 return
             }
             guard let docs = snapshot?.documents, !docs.isEmpty else {
-                print("No matching reserve documents found.")
-                // 카메라 및 AR 세션 중지
+                // 예약 정보 없음 시 알림 및 이전 화면으로 자동 복귀
                 DispatchQueue.main.async {
+                    // 카메라 및 AR 세션 정리
                     self.countdownTimer?.invalidate()
                     self.countdownTimer = nil
                     self.countdownLabel?.removeFromSuperview()
                     self.instructionLabel?.removeFromSuperview()
                     self.arView.session.pause()
                     self.arView.removeFromSuperview()
-                }
-                // 알림 생성 및 이전 화면 복귀 처리
-                let alert = UIAlertController(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.", preferredStyle: .alert)
-                alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
-                    _ = self.navigationController?.popViewController(animated: true)
-                })
-                DispatchQueue.main.async {
+
+                    // 알림 표시
+                    let alert = UIAlertController(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.", preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "확인", style: .default))
                     self.present(alert, animated: true)
-                }
-                // 10초 후 자동으로 이전 화면 복귀
-                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                    if self.presentedViewController === alert {
-                        alert.dismiss(animated: true) {
-                            _ = self.navigationController?.popViewController(animated: true)
+
+                    // 10초 후 자동 복귀
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                        if self.presentedViewController === alert {
+                            alert.dismiss(animated: true) {
+                                _ = self.navigationController?.popViewController(animated: true)
+                            }
                         }
                     }
                 }
                 return
             }
-            
+
             print("Firestore query returned \(docs.count) documents")
             let reserveIDs = docs.map { $0.documentID }
-               print("  ▶️ Retrieved reserveIDs:", reserveIDs)
+            print("  ▶️ Retrieved reserveIDs:", reserveIDs)
 
-            
             // For each reserve, fetch user vectors and compare
             for doc in docs {
                 let data = doc.data()
