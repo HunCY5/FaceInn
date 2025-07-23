@@ -822,6 +822,8 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
                 self.isFaceDetected = isValid
                 if self.isCountingDownActive {
                     if isValid && self.countdownTimer == nil {
+                        // 카운트다운 재개 및 안내
+                        self.showCountdownInstruction()
                         self.startCountdown()
                     } else if !isValid && self.countdownTimer != nil {
                         self.resetCountdown()
@@ -830,5 +832,24 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
             }
         }
         try? handler.perform([rectRequest])
+    }
+
+    // 카운트다운 안내 문구 표시
+    private func showCountdownInstruction() {
+        // 기존 안내문구 항상 제거
+        instructionLabel?.removeFromSuperview()
+        instructionLabel = nil
+        let newInstructionLabel = UILabel()
+        newInstructionLabel.text = "3초 후 자동으로 촬영됩니다"
+        newInstructionLabel.textColor = .white
+        newInstructionLabel.font = UIFont.systemFont(ofSize: 15)
+        newInstructionLabel.textAlignment = .center
+        newInstructionLabel.translatesAutoresizingMaskIntoConstraints = false
+        instructionLabel = newInstructionLabel
+        view.addSubview(newInstructionLabel)
+        NSLayoutConstraint.activate([
+            newInstructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            newInstructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110)
+        ])
     }
 }
