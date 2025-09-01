@@ -158,13 +158,13 @@ final class CheckInViewController: UIViewController {
 
         // 타이틀 레이블
         guestTitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        guestTitleLabel.text = "게스트 체크인/체크아웃"
+        guestTitleLabel.text = "체크인·체크아웃"
         guestTitleLabel.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
 
         // 서브타이틀 레이블
         let guestSubtitleLabel = UILabel()
         guestSubtitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        guestSubtitleLabel.text = "게스트가 얼굴 인식으로 체크인할 수 있는 화면입니다"
+        guestSubtitleLabel.text = "게스트가 체크인·체크아웃 할 수 있는 화면입니다"
         guestSubtitleLabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
         guestSubtitleLabel.textColor = .secondaryLabel
 

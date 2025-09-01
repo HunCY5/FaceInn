@@ -32,7 +32,7 @@ final class HostMainTabBarController: UITabBarController {
             rootViewController: CheckInViewController()
         )
         checkInNav.tabBarItem = UITabBarItem(
-            title: "체크인",
+            title: "페이스인",
             image: UIImage(systemName: "camera"),
             tag: 1
         )

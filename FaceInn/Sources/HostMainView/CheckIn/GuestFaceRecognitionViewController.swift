@@ -50,14 +50,77 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
     
     private let processor: FaceProcessor? = FaceProcessor()
 
-    // 정면 가이드 프레임 계산 프로퍼티
+    // MARK: - 기기별 레이아웃/임계치
+    private struct LayoutProfile {
+        // 원형 카메라 컨테이너 지름 비율
+        let circleScale: CGFloat
+        // 정면 가이드 프레임(사각형) 크기
+        let guideSize: CGSize
+        // 라벨/버튼 폰트 스케일
+        let fontScale: CGFloat
+        // 얼굴 박스 판정 임계치
+        let minFaceSize: CGSize              // Vision faceRect 최소 크기
+        let overlapRatioThreshold: CGFloat   // (교집합/face) 비율 임계치
+        let heightRatioThreshold: CGFloat    // (교집합 높이/face 높이) 임계치
+        // 오버레이 가이드 이미지 비율
+        let guideWidthRatio: CGFloat
+        let guideHeightRatio: CGFloat
+
+        func frontGuideRect(in bounds: CGRect) -> CGRect {
+            let w = guideSize.width
+            let h = guideSize.height
+            return CGRect(x: bounds.midX - w/2, y: bounds.midY - h/2, width: w, height: h)
+        }
+    }
+
+    // 현재 기기(iPhone/iPad)에 맞는 프로파일 반환
+    private func currentLayoutProfile() -> LayoutProfile {
+        if traitCollection.userInterfaceIdiom == .pad {
+            // iPad
+            return LayoutProfile(
+                circleScale: 0.80,
+                guideSize: CGSize(width: 300, height: 280),
+                fontScale: 1.18,
+                minFaceSize: CGSize(width: 120, height: 80),
+                overlapRatioThreshold: 0.60,
+                heightRatioThreshold: 0.60,
+                guideWidthRatio: 0.30,
+                guideHeightRatio: 0.45
+            )
+        } else {
+            // iPhone
+            return LayoutProfile(
+                circleScale: 0.90,
+                guideSize: CGSize(width: 300, height: 280),
+                fontScale: 1.0,
+                minFaceSize: CGSize(width: 140, height: 90),
+                overlapRatioThreshold: 0.65,
+                heightRatioThreshold: 0.65,
+                guideWidthRatio: 0.50,
+                guideHeightRatio: 0.75
+            )
+        }
+    }
+
+    // 정면 가이드 프레임 계산 (기기별 프로파일 적용)
     private var frontGuideRect: CGRect {
-        CGRect(
-            x: view.bounds.midX - 150,
-            y: view.bounds.midY - 140,
-            width: 300,
-            height: 280
-        )
+        return currentLayoutProfile().frontGuideRect(in: view.bounds)
+    }
+
+    // MARK: - 디버그용 정면 인식 박스 레이어
+    private var debugFrontBoxLayer: CAShapeLayer?
+
+    private func showDebugFrontGuideBox() {
+        debugFrontBoxLayer?.removeFromSuperlayer()
+        let layer = CAShapeLayer()
+        layer.frame = view.bounds
+        let path = UIBezierPath(rect: frontGuideRect)
+        layer.path = path.cgPath
+        layer.strokeColor = UIColor.yellow.withAlphaComponent(0.8).cgColor
+        layer.lineWidth = 2
+        layer.fillColor = UIColor.clear.cgColor
+        view.layer.addSublayer(layer)
+        debugFrontBoxLayer = layer
     }
     
     // MARK: - 생명 주기 메서드
@@ -95,18 +158,11 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
     // MARK: - UI 설정
     // 카메라 컨테이너 뷰 설정
     private func setupCameraContainer() {
-        let size: CGFloat = min(view.bounds.width, view.bounds.height) * 0.9
-        cameraContainer = UIView(frame: CGRect(
-            x: (view.bounds.width - size) / 2,
-            y: (view.bounds.height - size) / 2,
-            width: size,
-            height: size
-        ))
-        cameraContainer.layer.cornerRadius = size / 2
+        cameraContainer = UIView(frame: .zero)
+        cameraContainer.layer.cornerRadius = 0 // viewDidLayoutSubviews에서 원형 반영
         cameraContainer.layer.masksToBounds = true
         cameraContainer.backgroundColor = .clear
-        cameraContainer.autoresizingMask = [.flexibleLeftMargin, .flexibleRightMargin,
-                                            .flexibleTopMargin, .flexibleBottomMargin]
+        cameraContainer.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(cameraContainer)
     }
     
@@ -159,6 +215,43 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
             captureButton.heightAnchor.constraint(equalToConstant: 50)
         ])
         captureButton.addTarget(self, action: #selector(handleManualCapture), for: .touchUpInside)
+    }
+
+    // MARK: - 레이아웃 갱신 (아이폰/아이패드 분리 적용)
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let profile = currentLayoutProfile()
+
+        // 1) 원형 카메라 컨테이너 크기/위치 계산
+        let shortSide = min(view.bounds.width, view.bounds.height)
+        let diameter = shortSide * profile.circleScale
+        let frame = CGRect(
+            x: (view.bounds.width - diameter) / 2,
+            y: (view.bounds.height - diameter) / 2,
+            width: diameter,
+            height: diameter
+        )
+        cameraContainer.frame = frame
+        cameraContainer.layer.cornerRadius = diameter / 2
+
+        // 2) AR 뷰 & 오버레이 동기화
+        arView?.frame = cameraContainer.bounds
+        guideOverlayView.frame = cameraContainer.bounds
+        // 가이드 이미지 비율(기기별) 전달
+        guideOverlayView.guideWidthRatio = profile.guideWidthRatio
+        guideOverlayView.guideHeightRatio = profile.guideHeightRatio
+        guideOverlayView.setNeedsDisplay()
+
+        // 3) 라벨/버튼 폰트 스케일
+        topLabel?.font = UIFont.systemFont(ofSize: 18 * profile.fontScale, weight: .semibold)
+        bottomLabel?.font = UIFont.systemFont(ofSize: 15 * profile.fontScale)
+        captureButton?.titleLabel?.font = UIFont.systemFont(ofSize: 18 * profile.fontScale, weight: .semibold)
+        if let heightConstraint = (captureButton?.constraints.first { $0.firstAttribute == .height }) {
+            heightConstraint.constant = 50 * profile.fontScale
+        }
+
+        // 디버그 박스 표시
+        showDebugFrontGuideBox()
     }
     
     // AR 세션 설정
@@ -874,11 +967,12 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
             let intersectionArea = intersection.width * intersection.height
             let faceArea = faceRect.width * faceRect.height
             let heightRatio = intersection.height / faceRect.height
+            let profile = self.currentLayoutProfile()
             let isValid = faceArea > 0 &&
-                          (intersectionArea / faceArea > 0.65) &&
-                          (heightRatio > 0.65) &&
-                          faceRect.width >= 140 &&
-                          faceRect.height >= 90
+                          (intersectionArea / faceArea > profile.overlapRatioThreshold) &&
+                          (heightRatio > profile.heightRatioThreshold) &&
+                          faceRect.width  >= profile.minFaceSize.width &&
+                          faceRect.height >= profile.minFaceSize.height
             DispatchQueue.main.async {
                 self.guideOverlayView.strokeColor = isValid ? .green : .red
                 self.isFaceDetected = isValid
