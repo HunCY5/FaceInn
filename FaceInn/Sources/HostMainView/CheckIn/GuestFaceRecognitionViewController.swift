@@ -980,7 +980,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                     let cosRight = cosine(gvRight, rightVec)
                     print("Cosine similarities → front: \(cosFront), left: \(cosLeft), right: \(cosRight)")
 
-                    let thresholdCos: Float = 0.70 // 기준 값
+                    let thresholdCos: Float = 0.85 // 기준 값
                     if cosFront > thresholdCos && cosLeft > thresholdCos && cosRight > thresholdCos {
                         print("✅ Cosine match success for userID \(userID), reserveID \(reserveID)")
                         DispatchQueue.main.async {
