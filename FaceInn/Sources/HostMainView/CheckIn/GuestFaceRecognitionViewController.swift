@@ -49,6 +49,90 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
     private var countdownCount = 3
     
     private let processor: FaceProcessor? = FaceProcessor()
+
+    // MARK: - 기기별 레이아웃/임계치
+    private struct LayoutProfile {
+        // 원형 카메라 컨테이너 지름 비율
+        let circleScale: CGFloat
+        // 정면 가이드 프레임(사각형) 크기
+        let guideSize: CGSize
+        // 라벨/버튼 폰트 스케일
+        let fontScale: CGFloat
+        // 얼굴 박스 판정 임계치
+        let minFaceSize: CGSize              // Vision faceRect 최소 크기
+        let overlapRatioThreshold: CGFloat   // (교집합/face) 비율 임계치
+        let heightRatioThreshold: CGFloat    // (교집합 높이/face 높이) 임계치
+        // 오버레이 가이드 이미지 비율
+        let guideWidthRatio: CGFloat
+        let guideHeightRatio: CGFloat
+        // 측면 점선
+        let sideTargetBias: CGFloat
+        // 좌/우 가이드 이미지 위치
+        let sideImageLeftXRatio: CGFloat
+        let sideImageRightXRatio: CGFloat
+
+        func frontGuideRect(in bounds: CGRect) -> CGRect {
+            let w = guideSize.width
+            let h = guideSize.height
+            return CGRect(x: bounds.midX - w/2, y: bounds.midY - h/2, width: w, height: h)
+        }
+    }
+
+    // 현재 기기(iPhone/iPad)에 맞는 프로파일 반환
+    private func currentLayoutProfile() -> LayoutProfile {
+        if traitCollection.userInterfaceIdiom == .pad {
+            // iPad
+            return LayoutProfile(
+                circleScale: 0.80,
+                guideSize: CGSize(width: 300, height: 280),
+                fontScale: 1.18,
+                minFaceSize: CGSize(width: 120, height: 80),
+                overlapRatioThreshold: 0.60,
+                heightRatioThreshold: 0.60,
+                guideWidthRatio: 0.30,
+                guideHeightRatio: 0.45,
+                sideTargetBias: 0.75,
+                sideImageLeftXRatio: 0.28,         // 좌측 촬영 가이드 이미지 중앙으로
+                sideImageRightXRatio: 0.72         // 우측 촬영 가이드 이미지 중앙으로
+            )
+        } else {
+            // iPhone
+            return LayoutProfile(
+                circleScale: 0.90,
+                guideSize: CGSize(width: 300, height: 280),
+                fontScale: 1.0,
+                minFaceSize: CGSize(width: 140, height: 90),
+                overlapRatioThreshold: 0.65,
+                heightRatioThreshold: 0.65,
+                guideWidthRatio: 0.50,
+                guideHeightRatio: 0.75,
+                sideTargetBias: 1.0,               // iPhone: 기존 위치 유지
+                sideImageLeftXRatio: 0.20,         // iPhone: 현행 유지
+                sideImageRightXRatio: 0.80
+            )
+        }
+    }
+
+    // 정면 가이드 프레임 계산 (기기별 프로파일 적용)
+    private var frontGuideRect: CGRect {
+        return currentLayoutProfile().frontGuideRect(in: view.bounds)
+    }
+
+    // MARK: - 디버그용 정면 인식 박스 레이어
+    private var debugFrontBoxLayer: CAShapeLayer?
+
+    private func showDebugFrontGuideBox() {
+        debugFrontBoxLayer?.removeFromSuperlayer()
+        let layer = CAShapeLayer()
+        layer.frame = view.bounds
+        let path = UIBezierPath(rect: frontGuideRect)
+        layer.path = path.cgPath
+        layer.strokeColor = UIColor.yellow.withAlphaComponent(0.8).cgColor
+        layer.lineWidth = 2
+        layer.fillColor = UIColor.clear.cgColor
+        view.layer.addSublayer(layer)
+        debugFrontBoxLayer = layer
+    }
     
     // MARK: - 생명 주기 메서드
     enum RecognitionType {
@@ -70,6 +154,10 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         tabBarController?.tabBar.isHidden = true
+        // AR 세션 재시작
+        if let config = arView.session.configuration {
+            arView.session.run(config, options: [.resetTracking, .removeExistingAnchors])
+        }
     }
 
     // 화면이 사라질 때 탭바 보이기
@@ -81,18 +169,11 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
     // MARK: - UI 설정
     // 카메라 컨테이너 뷰 설정
     private func setupCameraContainer() {
-        let size: CGFloat = min(view.bounds.width, view.bounds.height) * 0.9
-        cameraContainer = UIView(frame: CGRect(
-            x: (view.bounds.width - size) / 2,
-            y: (view.bounds.height - size) / 2,
-            width: size,
-            height: size
-        ))
-        cameraContainer.layer.cornerRadius = size / 2
+        cameraContainer = UIView(frame: .zero)
+        cameraContainer.layer.cornerRadius = 0 // viewDidLayoutSubviews에서 원형 반영
         cameraContainer.layer.masksToBounds = true
         cameraContainer.backgroundColor = .clear
-        cameraContainer.autoresizingMask = [.flexibleLeftMargin, .flexibleRightMargin,
-                                            .flexibleTopMargin, .flexibleBottomMargin]
+        cameraContainer.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(cameraContainer)
     }
     
@@ -145,6 +226,45 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
             captureButton.heightAnchor.constraint(equalToConstant: 50)
         ])
         captureButton.addTarget(self, action: #selector(handleManualCapture), for: .touchUpInside)
+    }
+
+    // MARK: - 레이아웃 갱신 (아이폰/아이패드 분리 적용)
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let profile = currentLayoutProfile()
+
+        // 1) 원형 카메라 컨테이너 크기/위치 계산
+        let shortSide = min(view.bounds.width, view.bounds.height)
+        let diameter = shortSide * profile.circleScale
+        let frame = CGRect(
+            x: (view.bounds.width - diameter) / 2,
+            y: (view.bounds.height - diameter) / 2,
+            width: diameter,
+            height: diameter
+        )
+        cameraContainer.frame = frame
+        cameraContainer.layer.cornerRadius = diameter / 2
+
+        // 2) AR 뷰 & 오버레이 동기화
+        arView?.frame = cameraContainer.bounds
+        guideOverlayView.frame = cameraContainer.bounds
+        // 가이드 이미지 비율(기기별) 전달
+        guideOverlayView.guideWidthRatio = profile.guideWidthRatio
+        guideOverlayView.guideHeightRatio = profile.guideHeightRatio
+        guideOverlayView.sideImageLeftXRatio = profile.sideImageLeftXRatio
+        guideOverlayView.sideImageRightXRatio = profile.sideImageRightXRatio
+        guideOverlayView.setNeedsDisplay()
+
+        // 3) 라벨/버튼 폰트 스케일
+        topLabel?.font = UIFont.systemFont(ofSize: 18 * profile.fontScale, weight: .semibold)
+        bottomLabel?.font = UIFont.systemFont(ofSize: 15 * profile.fontScale)
+        captureButton?.titleLabel?.font = UIFont.systemFont(ofSize: 18 * profile.fontScale, weight: .semibold)
+        if let heightConstraint = (captureButton?.constraints.first { $0.firstAttribute == .height }) {
+            heightConstraint.constant = 50 * profile.fontScale
+        }
+
+        // 디버그 박스 표시
+        showDebugFrontGuideBox()
     }
     
     // AR 세션 설정
@@ -362,59 +482,9 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
     
     // 정면 얼굴 유효성 검사(Vision 사용)
     private func validateFrontFace(on pixelBuffer: CVPixelBuffer) {
-        let orientation: CGImagePropertyOrientation = .leftMirrored
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation, options: [:])
-        let request = VNDetectFaceLandmarksRequest { [weak self] req, error in
-            guard let self = self else { return }
-            guard let observations = req.results as? [VNFaceObservation], let obs = observations.first else {
-                DispatchQueue.main.async {
-                    self.guideOverlayView.strokeColor = .red
-                    self.isFaceDetected = false
-                    if self.isCountingDownActive, self.countdownTimer != nil {
-                        self.resetCountdown()
-                    }
-                }
-                return
-            }
-            let faceBox = VNImageRectForNormalizedRect(
-                obs.boundingBox,
-                Int(self.view.bounds.width),
-                Int(self.view.bounds.height)
-            )
-            // UIKit의 guideRect를 Vision의 정규화된 regionOfInterest 좌표로 변환
-            let guideRect = CGRect(x: self.view.bounds.midX - 150, y: self.view.bounds.midY - 140, width: 300, height: 280)
-            let intersection = guideRect.intersection(faceBox)
-            let intersectionArea = intersection.width * intersection.height
-            let faceArea = faceBox.width * faceBox.height
-            let heightRatio = intersection.height / faceBox.height
-            let areaThreshold: CGFloat = 0.65
-            let heightThreshold: CGFloat = 0.65
-            let isWithinGuide = faceArea > 0 && (intersectionArea / faceArea > areaThreshold)
-            let isWithinHeight = heightRatio > heightThreshold
-            let minWidth: CGFloat = 140
-            let minHeight: CGFloat = 90
-            let isLargeEnough = faceBox.width >= minWidth && faceBox.height >= minHeight
-            let isValid = isWithinGuide && isWithinHeight && isLargeEnough
-
-            DispatchQueue.main.async {
-                self.guideOverlayView.strokeColor = isValid ? .green : .red
-                let prev = self.isFaceDetected
-                self.isFaceDetected = isValid
-
-                if self.isCountingDownActive {
-                    if self.isFaceDetected {
-                        if self.countdownTimer == nil {
-                            self.startCountdown()
-                        }
-                    } else {
-                        if self.countdownTimer != nil {
-                            self.resetCountdown()
-                        }
-                    }
-                }
-            }
-        }
-        try? handler.perform([request])
+        // 사각형 기반 얼굴 검출로 대체 (Guest)
+        performRectangleRequest(on: pixelBuffer)
+        return
     }
     
     // MARK: - 촬영 및 진행
@@ -545,7 +615,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         let containerBounds = cameraContainer.bounds
         let fullLeftYaw: Float = -Float.pi / 2
         let normalizedTarget = leftTargetYaw / fullLeftYaw
-        let targetX = containerBounds.midX - (containerBounds.width / 2) * CGFloat(normalizedTarget)
+        let targetX = containerBounds.midX - (containerBounds.width / 2) * CGFloat(normalizedTarget) * currentLayoutProfile().sideTargetBias
 
         let targetPath = UIBezierPath()
         targetPath.move(to: CGPoint(x: targetX, y: 0))
@@ -580,7 +650,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         let containerBounds = cameraContainer.bounds
         let fullRightYaw: Float = Float.pi / 2
         let normalizedTarget = rightTargetYaw / fullRightYaw
-        let targetX = containerBounds.midX + (containerBounds.width / 2) * CGFloat(normalizedTarget)
+        let targetX = containerBounds.midX + (containerBounds.width / 2) * CGFloat(normalizedTarget) * currentLayoutProfile().sideTargetBias
 
         let targetPath = UIBezierPath()
         targetPath.move(to: CGPoint(x: targetX, y: 0))
@@ -752,6 +822,33 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         }
     }
     
+    // MARK: - 유틸: Firestore 벡터 안전 변환
+    // Firestore에 [NSNumber]/[Double]/[Float] 등 다양한 형태로 저장될 수 있으므로 안전하게 [Float]로 변환
+    private func toFloatArray(_ any: Any?) -> [Float]? {
+        // nil 방어
+        guard let any = any else { return nil }
+        // 이미 [Float]
+        if let v = any as? [Float] { return v }
+        // [Double] → [Float]
+        if let v = any as? [Double] { return v.map { Float($0) } }
+        // [NSNumber] → [Float]
+        if let v = any as? [NSNumber] { return v.map { $0.floatValue } }
+        // [[NSNumber]] (잘못 저장된 케이스) → 1차원 플랫
+        if let vv = any as? [[NSNumber]] { return vv.flatMap { $0.map { $0.floatValue } } }
+        // Data로 직렬화된 경우 (옵션)
+        if let data = any as? Data {
+            // 128차원 가정: 길이가 맞지 않으면 실패 처리
+            let count = 128
+            if data.count == count * MemoryLayout<Float>.size {
+                var arr = [Float](repeating: 0, count: count)
+                _ = arr.withUnsafeMutableBytes { data.copyBytes(to: $0)}
+                return arr
+            }
+        }
+        // 예상 외 타입 (예: Date/Timestamp 등) → nil
+        return nil
+    }
+
     // MARK: - Firestore 비교 로직
     // 게스트 벡터와 저장된 벡터 비교
     private func performComparison(with guestVectors: [FaceGuideOverlayView.FacePosition: [Float]]) {
@@ -787,67 +884,106 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                 return
             }
             guard let docs = snapshot?.documents, !docs.isEmpty else {
-                print("No matching reserve documents found.")
-                self.showAlert(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.")
+                // 예약 정보 없음 시 알림 및 이전 화면으로 자동 복귀
+                DispatchQueue.main.async {
+                    // 카메라 및 AR 세션 정리
+                    self.countdownTimer?.invalidate()
+                    self.countdownTimer = nil
+                    self.countdownLabel?.removeFromSuperview()
+                    self.instructionLabel?.removeFromSuperview()
+                    self.arView.session.pause()
+                    self.arView.removeFromSuperview()
+
+                    // 알림 표시
+                    let alert = UIAlertController(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.", preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "확인", style: .default))
+                    self.present(alert, animated: true)
+
+                    // 10초 후 자동 복귀
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                        if self.presentedViewController === alert {
+                            alert.dismiss(animated: true) {
+                                _ = self.navigationController?.popViewController(animated: true)
+                            }
+                        }
+                    }
+                }
                 return
             }
-            
+
             print("Firestore query returned \(docs.count) documents")
             let reserveIDs = docs.map { $0.documentID }
-               print("  ▶️ Retrieved reserveIDs:", reserveIDs)
+            print("  ▶️ Retrieved reserveIDs:", reserveIDs)
 
-            
             // For each reserve, fetch user vectors and compare
             for doc in docs {
                 let data = doc.data()
                 let reserveID = doc.documentID
                 print("Processing reserveID: \(reserveID)")
-                
+
                 guard let userID = data["userId"] as? String else {
                     print("  → reserveID \(reserveID) has no userID field")
                     continue
                 }
                 print("  → Found userID: \(userID)")
-                
+
                 db.collection("users").document(userID).getDocument { userSnap, err in
                     if let err = err {
                         print("  → 유저 데이터 불러오기 실패 for userID \(userID): \(err.localizedDescription)")
                         return
                     }
-                    guard let userData = userSnap?.data(),
-                          let frontVec = userData["front_vector"] as? [Float],
-                          let leftVec = userData["left_vector"] as? [Float],
-                          let rightVec = userData["right_vector"] as? [Float] else {
-                        print("  → userID \(userID) missing vector fields")
-                        
+                    guard let userData = userSnap?.data() else {
+                        print("  → userID \(userID) has no data")
                         return
                     }
-                    
-                    
-                    
-                    print("Comparing vectors for userID: \(userID), reserveID: \(reserveID)")
-                    // Compare each vector distance
-                    let threshold: Float = 0.6 // adjust as needed
-                    func l2(_ a: [Float], _ b: [Float]) -> Float {
-                        zip(a, b).map { ($0 - $1) * ($0 - $1) }.reduce(0, +)
+                    // 다양한 저장 형태([NSNumber]/[Double]/[Float]/Data 등)를 안전하게 [Float]로 변환
+                    guard let frontVec = self.toFloatArray(userData["front_vector"]),
+                          let leftVec  = self.toFloatArray(userData["left_vector"]),
+                          let rightVec = self.toFloatArray(userData["right_vector"]) else {
+                        print("  → userID \(userID) vector type mismatch (expected array-like)")
+                        return
                     }
+
                     guard let gvFront = guestVectors[.front],
                           let gvLeft = guestVectors[.left],
                           let gvRight = guestVectors[.right] else {
                         print("  → guestVectors missing one of front/left/right")
                         return
                     }
-                    
-                    let distFront = l2(gvFront, frontVec)
-                    let distLeft  = l2(gvLeft,  leftVec)
-                    let distRight = l2(gvRight, rightVec)
-                    print("  → Distances - front: \(distFront), left: \(distLeft), right: \(distRight), threshold: \(threshold)")
-                    
-                    // If all distances below threshold
-                    if distFront < threshold && distLeft < threshold && distRight < threshold {
-                        print("  → Vectors matched for userID \(userID), reserveID \(reserveID)")
+
+                    // 디버그: 차원 로그
+                    print("Dims guest/front/left/right → \(gvFront.count)/\(frontVec.count)/\(gvLeft.count)/\(leftVec.count)/\(gvRight.count)/\(rightVec.count)")
+
+                    // -- 코사인 유사도 --
+                    func cosine(_ a: [Float], _ b: [Float]) -> Float {
+                        // 길이 체크
+                        guard a.count == b.count, a.count > 0 else { return -1 }
+                        // 내적/노름 계산
+                        var dot: Float = 0
+                        var aa: Float = 0
+                        var bb: Float = 0
+                        for i in 0..<a.count {
+                            let x = a[i]
+                            let y = b[i]
+                            dot += x * y
+                            aa += x * x
+                            bb += y * y
+                        }
+                        let denom = sqrt(aa) * sqrt(bb)
+                        if denom == 0 || !denom.isFinite { return -1 }
+                        let v = dot / denom
+                        return v.isFinite ? v : -1
+                    }
+
+                    let cosFront = cosine(gvFront, frontVec)
+                    let cosLeft  = cosine(gvLeft,  leftVec)
+                    let cosRight = cosine(gvRight, rightVec)
+                    print("Cosine similarities → front: \(cosFront), left: \(cosLeft), right: \(cosRight)")
+
+                    let thresholdCos: Float = 0.85 // 기준 값
+                    if cosFront > thresholdCos && cosLeft > thresholdCos && cosRight > thresholdCos {
+                        print("✅ Cosine match success for userID \(userID), reserveID \(reserveID)")
                         DispatchQueue.main.async {
-                            // ReserveInfoViewController로 직접 push 및 데이터 전달
                             let reserveInfoVC = ReserveInfoViewController()
                             reserveInfoVC.reserveID = reserveID
                             reserveInfoVC.userID = userID
@@ -859,23 +995,56 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                             } else {
                                 self.present(reserveInfoVC, animated: true)
                             }
-                            // self.dismiss(animated: true) // push 방식에서는 필요 없음
                         }
                     } else {
-                        print("  → Vectors did NOT match for userID \(userID)")
+                        print("❌ Cosine match failure for userID \(userID), reserveID \(reserveID)")
                     }
                 }
             }
         }
     }
-    
-    // MARK: - 도우미 메서드
-    // 알림 표시
+
+    // MARK: - showAlert
     private func showAlert(title: String, message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
-            self.dismiss(animated: true)
-        })
-        present(alert, animated: true)
+        DispatchQueue.main.async {
+            let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "확인", style: .default))
+            self.present(alert, animated: true)
+        }
+    }
+    // Fallback: Vision 직사각형 검출 요청 공통 처리 (Guest 모드)
+    private func performRectangleRequest(on pixelBuffer: CVPixelBuffer) {
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .leftMirrored, options: [:])
+        let rectRequest = VNDetectFaceRectanglesRequest { [weak self] request, error in
+            guard let self = self else { return }
+            let faceRect = VNImageRectForNormalizedRect(
+                (request.results as? [VNFaceObservation])?.first?.boundingBox ?? .zero,
+                Int(self.view.bounds.width),
+                Int(self.view.bounds.height)
+            )
+            let guideRect = self.frontGuideRect
+            let intersection = guideRect.intersection(faceRect)
+            let intersectionArea = intersection.width * intersection.height
+            let faceArea = faceRect.width * faceRect.height
+            let heightRatio = intersection.height / faceRect.height
+            let profile = self.currentLayoutProfile()
+            let isValid = faceArea > 0 &&
+                          (intersectionArea / faceArea > profile.overlapRatioThreshold) &&
+                          (heightRatio > profile.heightRatioThreshold) &&
+                          faceRect.width  >= profile.minFaceSize.width &&
+                          faceRect.height >= profile.minFaceSize.height
+            DispatchQueue.main.async {
+                self.guideOverlayView.strokeColor = isValid ? .green : .red
+                self.isFaceDetected = isValid
+                if self.isCountingDownActive {
+                    if isValid && self.countdownTimer == nil {
+                        self.startCountdown()
+                    } else if !isValid && self.countdownTimer != nil {
+                        self.resetCountdown()
+                    }
+                }
+            }
+        }
+        try? handler.perform([rectRequest])
     }
 }

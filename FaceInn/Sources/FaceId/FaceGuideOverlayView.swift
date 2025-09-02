@@ -11,6 +11,15 @@ import UIKit
 
 final class FaceGuideOverlayView: UIView {
 
+    // 기기별로 컨트롤러에서 주입할 가이드 프레임 비율
+    var guideWidthRatio: CGFloat = 0.50   // 가로 비율
+    var guideHeightRatio: CGFloat = 0.75  // 세로 비율
+
+    // 좌/우 가이드 이미지의 X 위치 비율 (컨테이너 대비)
+    // iPhone: 0.20 / 0.80 (기본), iPad: 컨트롤러에서 0.28 / 0.72로 주입
+    var sideImageLeftXRatio: CGFloat = 0.20
+    var sideImageRightXRatio: CGFloat = 0.80
+
     // 현재 촬영할 얼굴 방향에 따라 안내 텍스트를 화면 상단에 표시하는 레이블
     private let guidanceLabel: UILabel = {
         let label = UILabel()
@@ -78,8 +87,8 @@ final class FaceGuideOverlayView: UIView {
         context.setBlendMode(.normal)
 
         // 가이드 이미지 크기: 컨테이너 크기에 대한 비율
-        let guideWidth = rect.width * 0.5
-        let guideHeight = rect.height * 0.75
+        let guideWidth = rect.width * guideWidthRatio
+        let guideHeight = rect.height * guideHeightRatio
         let imageSize = CGSize(width: guideWidth, height: guideHeight)
 
         // 이미지 이름 선택
@@ -108,14 +117,14 @@ final class FaceGuideOverlayView: UIView {
             )
         case .left:
             imageRect = CGRect(
-                x: rect.width * 0.2,
+                x: rect.width * sideImageLeftXRatio,
                 y: (rect.height - imageSize.height) / 2,
                 width: imageSize.width,
                 height: imageSize.height
             )
         case .right:
             imageRect = CGRect(
-                x: rect.width * 0.8 - imageSize.width,
+                x: rect.width * sideImageRightXRatio - imageSize.width,
                 y: (rect.height - imageSize.height) / 2,
                 width: imageSize.width,
                 height: imageSize.height

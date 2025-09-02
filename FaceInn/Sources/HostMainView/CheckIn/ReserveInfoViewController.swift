@@ -8,6 +8,7 @@
 
 import UIKit
 import FirebaseFirestore
+import FirebaseDatabase
 
 class ReserveInfoViewController: UIViewController {
     // 전달받는 데이터
@@ -159,6 +160,81 @@ class ReserveInfoViewController: UIViewController {
         button.addTarget(self, action: #selector(handleActionButton), for: .touchUpInside)
     }
 
+    // MARK: -  객실 키 파싱
+    // Firestore reserves 문서에서 accommodationId, hostId, roomId 추출
+    private func parseReserveKeys(_ reserveData: [String: Any]) -> (accommodationId: String, hostId: String, roomId: String)? {
+        let accId = (reserveData["accommodationId"] as? String)
+        guard
+            let accommodationId = accId,
+            let hostId = reserveData["hostId"] as? String,
+            let roomId = reserveData["roomId"] as? String
+        else {
+            return nil
+        }
+        return (accommodationId, hostId, roomId)
+    }
+
+    // MARK: - cardId 조회
+    // accmmodationId, hostId, roomId 이용해서 rooms 배열에서 roomId가 일치하는 항목을 찾아 cardId를 반환
+    private func fetchCardIdFromAccommodations(accommodationId: String,
+                                               expectedHostId: String,
+                                               roomId: String,
+                                               completion: @escaping (String?) -> Void) {
+        let db = Firestore.firestore()
+        db.collection("accommodations").document(accommodationId).getDocument { snap, err in
+            // 에러/문서 없음 방어
+            guard err == nil, let data = snap?.data() else {
+                completion(nil)
+                return
+            }
+            // 호스트 검증
+            if let hostId = data["hostId"] as? String, hostId != expectedHostId {
+                completion(nil)
+                return
+            }
+            // rooms 배열에서 해당 roomId 탐색
+            if let rooms = data["rooms"] as? [[String: Any]] {
+                if let room = rooms.first(where: { ($0["id"] as? String) == roomId }) {
+                    let cardId = room["cardId"] as? String
+                    completion(cardId)
+                    return
+                }
+            }
+            completion(nil)
+        }
+    }
+
+    // MARK: - RTDB에 roomStatus 저장
+    // /roomStatus/{accommodationId}/{roomId} 에 cardId/status 저장
+    private func writeRoomStatusToRTDB(accommodationId: String,
+                                       roomId: String,
+                                       isCheckIn: Bool,
+                                       cardId: String?) {
+        // 체크아웃 시 cardId: "00000000"
+        let cardToWrite = isCheckIn ? (cardId ?? "") : "0000000"
+        let statusToWrite = isCheckIn ? "checkin" : "checkout"
+
+        let ref = Database.database().reference()
+            .child("roomStatus")
+            .child(accommodationId)
+            .child(roomId)
+
+        let payload: [String: Any] = [
+            "cardId": cardToWrite,
+            "status": statusToWrite,
+            "updatedAt": Int(Date().timeIntervalSince1970 * 1000) // ms 타임스탬프
+        ]
+
+        // 기존 값 보존을 위해 updateChildValues 사용
+        ref.updateChildValues(payload) { err, _ in
+            if let err = err {
+                print("⚠️ roomStatus 저장 실패: \(err.localizedDescription)")
+            } else {
+                print("✅ roomStatus 저장 성공: \(accommodationId)/\(roomId) = \(statusToWrite), \(cardToWrite)")
+            }
+        }
+    }
+
     @objc private func handleActionButton() {
         // 이미 체크인/체크아웃 상태면 처리 중단 및 알림
         if isCheckIn, let checked = reserveData["checkIn"] as? Bool, checked == true {
@@ -183,6 +259,24 @@ class ReserveInfoViewController: UIViewController {
                 } else {
                     self?.reserveData["checkIn"] = true
                     self?.reserveData["checkInTimeStamp"] = now
+                    // 체크인 성공 시 RTDB에 roomStatus 기록
+                    if let keys = self?.parseReserveKeys(self?.reserveData ?? [:]) {
+                        self?.fetchCardIdFromAccommodations(accommodationId: keys.accommodationId,
+                                                            expectedHostId: keys.hostId,
+                                                            roomId: keys.roomId) { cardId in
+                            guard let cardId = cardId, !cardId.isEmpty else {
+                                // 카드ID를 찾지 못한 경우 사용자에게 안내
+                                print("accommodations.rooms 에서 cardId 찾기 실패")
+                                return
+                            }
+                            self?.writeRoomStatusToRTDB(accommodationId: keys.accommodationId,
+                                                        roomId: keys.roomId,
+                                                        isCheckIn: true,
+                                                        cardId: cardId)
+                        }
+                    } else {
+                        print("reserves 데이터에서 accommodationId/hostId/roomId 추출 실패")
+                    }
                     self?.showCompletionAndGoBack(message: "체크인이 완료되었습니다.")
                 }
             }
@@ -199,6 +293,15 @@ class ReserveInfoViewController: UIViewController {
                     self?.reserveData["checkIn"] = false
                     self?.reserveData["checkOut"] = true
                     self?.reserveData["checkOutTimeStamp"] = now
+                    // 체크아웃 성공 시 RTDB에 roomStatus 기록
+                    if let keys = self?.parseReserveKeys(self?.reserveData ?? [:]) {
+                        self?.writeRoomStatusToRTDB(accommodationId: keys.accommodationId,
+                                                    roomId: keys.roomId,
+                                                    isCheckIn: false,
+                                                    cardId: nil)
+                    } else {
+                        print("⚠️ reserves 데이터에서 accommodationId/hostId/roomId 추출 실패")
+                    }
                     self?.showCompletionAndGoBack(message: "체크아웃이 완료되었습니다.")
                 }
             }

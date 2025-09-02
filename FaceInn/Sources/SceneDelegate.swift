@@ -20,24 +20,18 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         let window = UIWindow(windowScene: windowScene)
-        let userType = UserDefaults.standard.string(forKey: "userType") ?? "guest"
-        let user = Auth.auth().currentUser
-        let db = Firestore.firestore()
-
-        if userType == "host", let uid = user?.uid {
-            db.collection("users").document(uid).getDocument { snapshot, error in
-                guard error == nil, let data = snapshot?.data() else {
-                    self.setRootViewController(MainTabBarController())
-                    return
-                }
-                if let accommodationId = data["accommodationId"] as? String, !accommodationId.isEmpty {
-                    self.setRootViewController(HostMainTabBarController())
-                } else {
-                    self.setRootViewController(AccommodationRegisterViewController())
-                }
-            }
-        } else {
+        guard let user = Auth.auth().currentUser else {
             self.setRootViewController(MainTabBarController())
+            self.window = window
+            return
+        }
+        let db = Firestore.firestore()
+        db.collection("users").document(user.uid).getDocument { snapshot, error in
+            if let data = snapshot?.data(), let userType = data["type"] as? String, userType == "host" {
+                self.setRootViewController(HostMainTabBarController())
+            } else {
+                self.setRootViewController(MainTabBarController())
+            }
         }
         self.window = window
         return
