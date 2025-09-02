@@ -286,6 +286,11 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
             showAlert(title: "얼굴 인식 필요", message: "프레임에 얼굴을 맞춰주세요")
             return
         }
+        
+        // 이전 인식 세션에서 남은 얼굴 이미지 캐시 제거 (상태는 유지)
+        faceImages.removeAll()
+        currentFacePosition = .front
+        guideOverlayView.currentPosition = .front
         isCountingDownActive = true
         topLabel.removeFromSuperview()
         captureButton.isHidden = true
@@ -693,7 +698,8 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         linePath.addLine(to: CGPoint(x: currentX - containerBounds.minX, y: containerBounds.height))
         currentLayer.path = linePath.cgPath
         let diffX = abs(currentX - targetX)
-        let pixelThreshold: CGFloat = 10
+        let containerDiameter = min(self.cameraContainer.bounds.width, self.cameraContainer.bounds.height)
+        let pixelThreshold: CGFloat = containerDiameter * 0.012 // 직경의 1.2%
         if isCountingDownActive {
             guideOverlayView.strokeColor = .green
         } else {
@@ -755,7 +761,8 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         linePath.addLine(to: CGPoint(x: currentX - containerBounds.minX, y: containerBounds.height))
         currentLayer.path = linePath.cgPath
         let diffX = abs(currentX - targetX)
-        let pixelThreshold: CGFloat = 10
+        let containerDiameter = min(self.cameraContainer.bounds.width, self.cameraContainer.bounds.height)
+        let pixelThreshold: CGFloat = containerDiameter * 0.012 // 직경의 1.2%
         if isCountingDownActive {
             guideOverlayView.strokeColor = .green
         } else {
@@ -806,7 +813,28 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         let dispatchGroup = DispatchGroup()
         
         for (position, image) in faceImages {
-            if let buffer = image.pixelBuffer(width: 112, height: 112), let proc = processor {
+            // 1) UIImage를 orientation 반영한 CGImage로 변환
+            let srcSize = image.size
+            let orientedImage = UIGraphicsImageRenderer(size: srcSize).image { _ in
+                image.draw(in: CGRect(origin: .zero, size: srcSize))
+            }
+            guard let cg = orientedImage.cgImage else { continue }
+
+            // 2) Vision으로 얼굴 박스 검출 (정면/측면 공통, 실패 시 전체 프레임 fallback)
+            var faceRectPix = CGRect(x: 0, y: 0, width: cg.width, height: cg.height)
+            let handler = VNImageRequestHandler(cgImage: cg, options: [:])
+            let req = VNDetectFaceRectanglesRequest()
+            do {
+                try handler.perform([req])
+                if let bbox = (req.results as? [VNFaceObservation])?.first?.boundingBox, bbox != .zero {
+                    faceRectPix = VNImageRectForNormalizedRect(bbox, cg.width, cg.height)
+                }
+            } catch {
+                print("Vision face detect failed: \(error.localizedDescription). Using full frame.")
+            }
+
+            // 3) 얼굴 박스 기준으로 112x112 BGRA/sRGB 픽셀버퍼 생성 (Aspect-Fill)
+            if let buffer = orientedImage.pixelBuffer(cropRect: faceRectPix, width: 112, height: 112, aspectFill: true), let proc = processor {
                 dispatchGroup.enter()
                 proc.extractFaceEmbedding(from: buffer) { vector in
                     if let v = vector {
@@ -980,7 +1008,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                     let cosRight = cosine(gvRight, rightVec)
                     print("Cosine similarities → front: \(cosFront), left: \(cosLeft), right: \(cosRight)")
 
-                    let thresholdCos: Float = 0.85 // 기준 값
+                    let thresholdCos: Float = 0.7 // 기준 값
                     if cosFront > thresholdCos && cosLeft > thresholdCos && cosRight > thresholdCos {
                         print("✅ Cosine match success for userID \(userID), reserveID \(reserveID)")
                         DispatchQueue.main.async {
@@ -990,6 +1018,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                             reserveInfoVC.userData = userData
                             reserveInfoVC.isCheckIn = (self.recognitionType == .checkIn)
                             reserveInfoVC.reserveData = data
+                            self.resetRecognitionSession()
                             if let nav = self.navigationController {
                                 nav.pushViewController(reserveInfoVC, animated: true)
                             } else {
@@ -1004,6 +1033,27 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         }
     }
 
+    // MARK: - 세션/캐시 초기화 유틸
+    private func resetRecognitionSession() {
+        // 얼굴 이미지/벡터 캐시 제거
+        faceImages.removeAll()
+        // 카운트다운/라벨/가이드 상태 정리
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        countdownLabel?.removeFromSuperview()
+        instructionLabel?.removeFromSuperview()
+        countdownLabel = nil
+        instructionLabel = nil
+        // 위치/표시 상태 리셋
+        currentFacePosition = .front
+        guideOverlayView.currentPosition = .front
+        guideOverlayView.strokeColor = .red
+        isFaceDetected = false
+        isCountingDownActive = false
+        // AR 세션 일시 중지(중복 네비/중복 캡처 방지)
+        arView?.session.pause()
+    }
+    
     // MARK: - showAlert
     private func showAlert(title: String, message: String) {
         DispatchQueue.main.async {

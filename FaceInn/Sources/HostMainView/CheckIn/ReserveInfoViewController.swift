@@ -231,19 +231,6 @@ class ReserveInfoViewController: UIViewController {
                 print("⚠️ roomStatus 저장 실패: \(err.localizedDescription)")
             } else {
                 print("✅ roomStatus 저장 성공: \(accommodationId)/\(roomId) = \(statusToWrite), \(cardToWrite)")
-                // 체크인일 때만 5초 후에 방금 생성(업데이트)한 문서를 삭제
-                if isCheckIn {
-                    let deleteRef = ref
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                        deleteRef.removeValue { delErr, _ in
-                            if let delErr = delErr {
-                                print("⚠️ roomStatus 삭제 실패: \(delErr.localizedDescription)")
-                            } else {
-                                print("🗑️ roomStatus 삭제 성공: \(accommodationId)/\(roomId)")
-                            }
-                        }
-                    }
-                }
             }
         }
     }

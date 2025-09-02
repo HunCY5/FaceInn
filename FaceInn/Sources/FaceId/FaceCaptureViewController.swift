@@ -316,7 +316,8 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
         
         // 타겟 위치와의 픽셀 거리 계산
         let diffX = abs(currentX - targetX)
-        let pixelThreshold: CGFloat = 10
+        let containerDiameter = min(self.cameraContainer.bounds.width, self.cameraContainer.bounds.height)
+        let pixelThreshold: CGFloat = containerDiameter * 0.012 // 직경의 1.2%
         
         // 카운트다운 중일 때만 guideOverlayView.strokeColor를 green으로, 아니면 항상 빨간색 (측면 모드)
         if isCountingDownActive {
@@ -475,7 +476,8 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
         
         // 타겟 위치와의 픽셀 거리 계산
         let diffX = abs(currentX - targetX)
-        let pixelThreshold: CGFloat = 10
+        let containerDiameter = min(self.cameraContainer.bounds.width, self.cameraContainer.bounds.height)
+        let pixelThreshold: CGFloat = containerDiameter * 0.012 // 직경의 1.2%
         
         // 카운트다운 중일 때만 guideOverlayView.strokeColor를 green으로, 아니면 항상 빨간색 (측면 모드)
         if isCountingDownActive {
@@ -544,11 +546,38 @@ final class FaceCaptureViewController: UIViewController, ARSessionDelegate {
         let group = DispatchGroup()
         
         for (position, image) in faceImages {
-            if let buffer = image.pixelBuffer(width: 112, height: 112) {
+            // 1) UIImage를 orientation 반영한 CGImage로 변환
+            let srcSize = image.size
+            let orientedImage = UIGraphicsImageRenderer(size: srcSize).image { _ in
+                image.draw(in: CGRect(origin: .zero, size: srcSize))
+            }
+            guard let cg = orientedImage.cgImage else { continue }
+
+            // 2) Vision으로 얼굴 박스 검출 (실패 시 전체 프레임 fallback)
+            var faceRectPix = CGRect(x: 0, y: 0, width: cg.width, height: cg.height)
+            let handler = VNImageRequestHandler(cgImage: cg, options: [:])
+            let req = VNDetectFaceRectanglesRequest()
+            do {
+                try handler.perform([req])
+                if let bbox = (req.results as? [VNFaceObservation])?.first?.boundingBox, bbox != .zero {
+                    faceRectPix = VNImageRectForNormalizedRect(bbox, cg.width, cg.height)
+                }
+            } catch {
+                print("Vision face detect failed: \(error.localizedDescription). Using full frame.")
+            }
+
+            // 3) 얼굴 박스 기준 112x112 BGRA/sRGB 픽셀버퍼 생성 (Aspect-Fill)
+            if let buffer = orientedImage.pixelBuffer(cropRect: faceRectPix, width: 112, height: 112, aspectFill: true)
+                ?? image.pixelBuffer(width: 112, height: 112) { // 최후 fallback
                 group.enter()
                 processor?.extractFaceEmbedding(from: buffer) { vector in
-                    if let vector = vector {
-                        data["\(position.rawValue)_vector"] = vector
+                    if var v = vector {
+                        // L2 정규화로 수치 안정화 (임베딩 분포 일관성)
+                        var norm: Float = 0
+                        for x in v { norm += x * x }
+                        norm = sqrt(max(norm, 1e-9))
+                        v = v.map { $0 / norm }
+                        data["\(position.rawValue)_vector"] = v
                     }
                     group.leave()
                 }
