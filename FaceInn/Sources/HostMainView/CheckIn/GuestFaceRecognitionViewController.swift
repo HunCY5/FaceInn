@@ -65,6 +65,11 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         // 오버레이 가이드 이미지 비율
         let guideWidthRatio: CGFloat
         let guideHeightRatio: CGFloat
+        // 측면 점선
+        let sideTargetBias: CGFloat
+        // 좌/우 가이드 이미지 위치
+        let sideImageLeftXRatio: CGFloat
+        let sideImageRightXRatio: CGFloat
 
         func frontGuideRect(in bounds: CGRect) -> CGRect {
             let w = guideSize.width
@@ -85,7 +90,10 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                 overlapRatioThreshold: 0.60,
                 heightRatioThreshold: 0.60,
                 guideWidthRatio: 0.30,
-                guideHeightRatio: 0.45
+                guideHeightRatio: 0.45,
+                sideTargetBias: 0.75,
+                sideImageLeftXRatio: 0.28,         // 좌측 촬영 가이드 이미지 중앙으로
+                sideImageRightXRatio: 0.72         // 우측 촬영 가이드 이미지 중앙으로
             )
         } else {
             // iPhone
@@ -97,7 +105,10 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                 overlapRatioThreshold: 0.65,
                 heightRatioThreshold: 0.65,
                 guideWidthRatio: 0.50,
-                guideHeightRatio: 0.75
+                guideHeightRatio: 0.75,
+                sideTargetBias: 1.0,               // iPhone: 기존 위치 유지
+                sideImageLeftXRatio: 0.20,         // iPhone: 현행 유지
+                sideImageRightXRatio: 0.80
             )
         }
     }
@@ -240,6 +251,8 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         // 가이드 이미지 비율(기기별) 전달
         guideOverlayView.guideWidthRatio = profile.guideWidthRatio
         guideOverlayView.guideHeightRatio = profile.guideHeightRatio
+        guideOverlayView.sideImageLeftXRatio = profile.sideImageLeftXRatio
+        guideOverlayView.sideImageRightXRatio = profile.sideImageRightXRatio
         guideOverlayView.setNeedsDisplay()
 
         // 3) 라벨/버튼 폰트 스케일
@@ -602,7 +615,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         let containerBounds = cameraContainer.bounds
         let fullLeftYaw: Float = -Float.pi / 2
         let normalizedTarget = leftTargetYaw / fullLeftYaw
-        let targetX = containerBounds.midX - (containerBounds.width / 2) * CGFloat(normalizedTarget)
+        let targetX = containerBounds.midX - (containerBounds.width / 2) * CGFloat(normalizedTarget) * currentLayoutProfile().sideTargetBias
 
         let targetPath = UIBezierPath()
         targetPath.move(to: CGPoint(x: targetX, y: 0))
@@ -637,7 +650,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         let containerBounds = cameraContainer.bounds
         let fullRightYaw: Float = Float.pi / 2
         let normalizedTarget = rightTargetYaw / fullRightYaw
-        let targetX = containerBounds.midX + (containerBounds.width / 2) * CGFloat(normalizedTarget)
+        let targetX = containerBounds.midX + (containerBounds.width / 2) * CGFloat(normalizedTarget) * currentLayoutProfile().sideTargetBias
 
         let targetPath = UIBezierPath()
         targetPath.move(to: CGPoint(x: targetX, y: 0))
@@ -809,6 +822,33 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         }
     }
     
+    // MARK: - 유틸: Firestore 벡터 안전 변환
+    // Firestore에 [NSNumber]/[Double]/[Float] 등 다양한 형태로 저장될 수 있으므로 안전하게 [Float]로 변환
+    private func toFloatArray(_ any: Any?) -> [Float]? {
+        // nil 방어
+        guard let any = any else { return nil }
+        // 이미 [Float]
+        if let v = any as? [Float] { return v }
+        // [Double] → [Float]
+        if let v = any as? [Double] { return v.map { Float($0) } }
+        // [NSNumber] → [Float]
+        if let v = any as? [NSNumber] { return v.map { $0.floatValue } }
+        // [[NSNumber]] (잘못 저장된 케이스) → 1차원 플랫
+        if let vv = any as? [[NSNumber]] { return vv.flatMap { $0.map { $0.floatValue } } }
+        // Data로 직렬화된 경우 (옵션)
+        if let data = any as? Data {
+            // 128차원 가정: 길이가 맞지 않으면 실패 처리
+            let count = 128
+            if data.count == count * MemoryLayout<Float>.size {
+                var arr = [Float](repeating: 0, count: count)
+                _ = arr.withUnsafeMutableBytes { data.copyBytes(to: $0)}
+                return arr
+            }
+        }
+        // 예상 외 타입 (예: Date/Timestamp 등) → nil
+        return nil
+    }
+
     // MARK: - Firestore 비교 로직
     // 게스트 벡터와 저장된 벡터 비교
     private func performComparison(with guestVectors: [FaceGuideOverlayView.FacePosition: [Float]]) {
@@ -892,11 +932,15 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                         print("  → 유저 데이터 불러오기 실패 for userID \(userID): \(err.localizedDescription)")
                         return
                     }
-                    guard let userData = userSnap?.data(),
-                          let frontVec = userData["front_vector"] as? [Float],
-                          let leftVec = userData["left_vector"] as? [Float],
-                          let rightVec = userData["right_vector"] as? [Float] else {
-                        print("  → userID \(userID) missing vector fields")
+                    guard let userData = userSnap?.data() else {
+                        print("  → userID \(userID) has no data")
+                        return
+                    }
+                    // 다양한 저장 형태([NSNumber]/[Double]/[Float]/Data 등)를 안전하게 [Float]로 변환
+                    guard let frontVec = self.toFloatArray(userData["front_vector"]),
+                          let leftVec  = self.toFloatArray(userData["left_vector"]),
+                          let rightVec = self.toFloatArray(userData["right_vector"]) else {
+                        print("  → userID \(userID) vector type mismatch (expected array-like)")
                         return
                     }
 
@@ -907,12 +951,28 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                         return
                     }
 
+                    // 디버그: 차원 로그
+                    print("Dims guest/front/left/right → \(gvFront.count)/\(frontVec.count)/\(gvLeft.count)/\(leftVec.count)/\(gvRight.count)/\(rightVec.count)")
+
                     // -- 코사인 유사도 --
                     func cosine(_ a: [Float], _ b: [Float]) -> Float {
-                        let dotProduct = zip(a, b).map(*).reduce(0, +)
-                        let magnitudeA = sqrt(zip(a, a).map(*).reduce(0, +))
-                        let magnitudeB = sqrt(zip(b, b).map(*).reduce(0, +))
-                        return dotProduct / (magnitudeA * magnitudeB)
+                        // 길이 체크
+                        guard a.count == b.count, a.count > 0 else { return -1 }
+                        // 내적/노름 계산
+                        var dot: Float = 0
+                        var aa: Float = 0
+                        var bb: Float = 0
+                        for i in 0..<a.count {
+                            let x = a[i]
+                            let y = b[i]
+                            dot += x * y
+                            aa += x * x
+                            bb += y * y
+                        }
+                        let denom = sqrt(aa) * sqrt(bb)
+                        if denom == 0 || !denom.isFinite { return -1 }
+                        let v = dot / denom
+                        return v.isFinite ? v : -1
                     }
 
                     let cosFront = cosine(gvFront, frontVec)
@@ -920,7 +980,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                     let cosRight = cosine(gvRight, rightVec)
                     print("Cosine similarities → front: \(cosFront), left: \(cosLeft), right: \(cosRight)")
 
-                    let thresholdCos: Float = 0.75 // 기준 값
+                    let thresholdCos: Float = 0.70 // 기준 값
                     if cosFront > thresholdCos && cosLeft > thresholdCos && cosRight > thresholdCos {
                         print("✅ Cosine match success for userID \(userID), reserveID \(reserveID)")
                         DispatchQueue.main.async {
