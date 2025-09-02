@@ -47,6 +47,9 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
     private var isCountingDownActive = false
     private var countdownTimer: Timer?
     private var countdownCount = 3
+    // 예약 비교/알림 중복 방지 플래그
+    private var hasPresentedAlert = false
+    private var comparisonInProgress = false
     
     private let processor: FaceProcessor? = FaceProcessor()
 
@@ -849,23 +852,59 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         return nil
     }
 
+    // 예약 없음/불일치/에러 공통 처리: 세션 정지 후 알림 표시, 확인 시 이전 화면으로 복귀
+    private func showInfoAndPop(title: String, message: String) {
+        // ✅ 중복 표시 방지
+        if hasPresentedAlert { return }
+        hasPresentedAlert = true
+        comparisonInProgress = false
+
+        DispatchQueue.main.async {
+            // 카운트다운/세션/오버레이 정리
+            self.countdownTimer?.invalidate()
+            self.countdownTimer = nil
+            self.countdownLabel?.removeFromSuperview()
+            self.instructionLabel?.removeFromSuperview()
+            self.arView.session.pause()
+            self.arView.removeFromSuperview()
+
+            // 알림 생성 및 "확인" 시 이전 화면으로 복귀
+            let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "확인", style: .default, handler: { _ in
+                _ = self.navigationController?.popViewController(animated: true)
+            }))
+
+            // 보조 안전장치: 10초 후 자동 복귀
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                if self.presentedViewController === alert {
+                    alert.dismiss(animated: true) {
+                        _ = self.navigationController?.popViewController(animated: true)
+                    }
+                }
+            }
+            self.present(alert, animated: true)
+        }
+    }
+
     // MARK: - Firestore 비교 로직
     // 게스트 벡터와 저장된 벡터 비교
     private func performComparison(with guestVectors: [FaceGuideOverlayView.FacePosition: [Float]]) {
+        // 이미 알림을 띄웠다면 더 이상 진행하지 않음
+        if hasPresentedAlert { return }
+        comparisonInProgress = true
+
         guard let hostID = Auth.auth().currentUser?.uid else { return }
         let db = Firestore.firestore()
         let now = Date()
         let calendar = Calendar.current
-        
+
         let startOfToday = calendar.startOfDay(for: now)
         let startOfTomorrow = calendar.date(byAdding: .day, value: 1, to: startOfToday)!
-        
 
-        
         var query: Query = db.collection("reserves")
             .whereField("hostId", isEqualTo: hostID)
             .whereField("useFaceId", isEqualTo: true)
-        
+
         switch recognitionType {
         case .checkIn:
             query = query
@@ -876,103 +915,83 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                 .whereField("endDate", isGreaterThanOrEqualTo: Timestamp(date: startOfToday))
                 .whereField("endDate", isLessThan: Timestamp(date: startOfTomorrow))
         }
-        
+
         query.getDocuments { snapshot, error in
             if let error = error {
                 print("Firestore error: \(error.localizedDescription)")
-                self.showAlert(title: "에러", message: "예약 정보를 불러올 수 없습니다.\n\(error.localizedDescription)")
+                self.showInfoAndPop(title: "에러", message: "예약 정보를 불러올 수 없습니다.\n\(error.localizedDescription)")
                 return
             }
             guard let docs = snapshot?.documents, !docs.isEmpty else {
-                // 예약 정보 없음 시 알림 및 이전 화면으로 자동 복귀
-                DispatchQueue.main.async {
-                    // 카메라 및 AR 세션 정리
-                    self.countdownTimer?.invalidate()
-                    self.countdownTimer = nil
-                    self.countdownLabel?.removeFromSuperview()
-                    self.instructionLabel?.removeFromSuperview()
-                    self.arView.session.pause()
-                    self.arView.removeFromSuperview()
-
-                    // 알림 표시
-                    let alert = UIAlertController(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.", preferredStyle: .alert)
-                    alert.addAction(UIAlertAction(title: "확인", style: .default))
-                    self.present(alert, animated: true)
-
-                    // 10초 후 자동 복귀
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                        if self.presentedViewController === alert {
-                            alert.dismiss(animated: true) {
-                                _ = self.navigationController?.popViewController(animated: true)
-                            }
-                        }
-                    }
-                }
+                // ✅ 후보 문서 자체가 없을 때: 즉시 알림 + 복귀
+                self.showInfoAndPop(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.")
                 return
             }
 
             print("Firestore query returned \(docs.count) documents")
-            let reserveIDs = docs.map { $0.documentID }
-            print("  ▶️ Retrieved reserveIDs:", reserveIDs)
 
-            // For each reserve, fetch user vectors and compare
+            // ✅ 전부 비교 후에도 매칭 없으면 알림
+            var matched = false
+            var processed = 0
+            let total = docs.count
+
+            // 게스트 벡터 유효성 확인 (정면/좌/우 모두 존재해야 함)
+            guard let gvFront = guestVectors[.front],
+                  let gvLeft  = guestVectors[.left],
+                  let gvRight = guestVectors[.right] else {
+                print("→ guestVectors missing one of front/left/right")
+                self.showInfoAndPop(title: "인식 실패", message: "촬영된 얼굴 정보가 올바르지 않습니다. 다시 시도해 주세요.")
+                return
+            }
+
+            func cosine(_ a: [Float], _ b: [Float]) -> Float {
+                guard a.count == b.count, a.count > 0 else { return -1 }
+                var dot: Float = 0, aa: Float = 0, bb: Float = 0
+                for i in 0..<a.count { let x = a[i], y = b[i]; dot += x*y; aa += x*x; bb += y*y }
+                let denom = sqrt(aa) * sqrt(bb)
+                if denom == 0 || !denom.isFinite { return -1 }
+                let v = dot / denom
+                return v.isFinite ? v : -1
+            }
+
+            let thresholdCos: Float = 0.70 // ✅ 코사인 유사도 임계값
+
             for doc in docs {
+                if self.hasPresentedAlert { return } // 이미 다른 경로로 종료됨
+
                 let data = doc.data()
                 let reserveID = doc.documentID
-                print("Processing reserveID: \(reserveID)")
 
                 guard let userID = data["userId"] as? String else {
-                    print("  → reserveID \(reserveID) has no userID field")
+                    print("→ reserveID \(reserveID) has no userID field")
+                    processed += 1
+                    if processed == total && !matched && !self.hasPresentedAlert {
+                        self.showInfoAndPop(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.")
+                    }
                     continue
                 }
-                print("  → Found userID: \(userID)")
 
                 db.collection("users").document(userID).getDocument { userSnap, err in
+                    defer {
+                        processed += 1
+                        if processed == total && !matched && !self.hasPresentedAlert {
+                            self.showInfoAndPop(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.")
+                        }
+                    }
+
                     if let err = err {
-                        print("  → 유저 데이터 불러오기 실패 for userID \(userID): \(err.localizedDescription)")
+                        print("→ 유저 데이터 불러오기 실패 for userID \(userID): \(err.localizedDescription)")
                         return
                     }
                     guard let userData = userSnap?.data() else {
-                        print("  → userID \(userID) has no data")
+                        print("→ userID \(userID) has no data")
                         return
                     }
-                    // 다양한 저장 형태([NSNumber]/[Double]/[Float]/Data 등)를 안전하게 [Float]로 변환
                     guard let frontVec = self.toFloatArray(userData["front_vector"]),
                           let leftVec  = self.toFloatArray(userData["left_vector"]),
                           let rightVec = self.toFloatArray(userData["right_vector"]) else {
-                        print("  → userID \(userID) vector type mismatch (expected array-like)")
+                        print("→ userID \(userID) vector type mismatch (expected array-like)")
                         return
-                    }
-
-                    guard let gvFront = guestVectors[.front],
-                          let gvLeft = guestVectors[.left],
-                          let gvRight = guestVectors[.right] else {
-                        print("  → guestVectors missing one of front/left/right")
-                        return
-                    }
-
-                    // 디버그: 차원 로그
-                    print("Dims guest/front/left/right → \(gvFront.count)/\(frontVec.count)/\(gvLeft.count)/\(leftVec.count)/\(gvRight.count)/\(rightVec.count)")
-
-                    // -- 코사인 유사도 --
-                    func cosine(_ a: [Float], _ b: [Float]) -> Float {
-                        // 길이 체크
-                        guard a.count == b.count, a.count > 0 else { return -1 }
-                        // 내적/노름 계산
-                        var dot: Float = 0
-                        var aa: Float = 0
-                        var bb: Float = 0
-                        for i in 0..<a.count {
-                            let x = a[i]
-                            let y = b[i]
-                            dot += x * y
-                            aa += x * x
-                            bb += y * y
-                        }
-                        let denom = sqrt(aa) * sqrt(bb)
-                        if denom == 0 || !denom.isFinite { return -1 }
-                        let v = dot / denom
-                        return v.isFinite ? v : -1
                     }
 
                     let cosFront = cosine(gvFront, frontVec)
@@ -980,9 +999,9 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                     let cosRight = cosine(gvRight, rightVec)
                     print("Cosine similarities → front: \(cosFront), left: \(cosLeft), right: \(cosRight)")
 
-                    let thresholdCos: Float = 0.85 // 기준 값
                     if cosFront > thresholdCos && cosLeft > thresholdCos && cosRight > thresholdCos {
-                        print("✅ Cosine match success for userID \(userID), reserveID \(reserveID)")
+                        matched = true
+                        if self.hasPresentedAlert { return }
                         DispatchQueue.main.async {
                             let reserveInfoVC = ReserveInfoViewController()
                             reserveInfoVC.reserveID = reserveID
@@ -996,8 +1015,6 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                                 self.present(reserveInfoVC, animated: true)
                             }
                         }
-                    } else {
-                        print("❌ Cosine match failure for userID \(userID), reserveID \(reserveID)")
                     }
                 }
             }
