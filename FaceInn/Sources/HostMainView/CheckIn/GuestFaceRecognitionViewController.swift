@@ -88,7 +88,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
             return LayoutProfile(
                 circleScale: 0.80,
                 guideSize: CGSize(width: 300, height: 280),
-                fontScale: 1.18,
+                fontScale: 1.6,
                 minFaceSize: CGSize(width: 120, height: 80),
                 overlapRatioThreshold: 0.60,
                 heightRatioThreshold: 0.60,
@@ -852,8 +852,8 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         return nil
     }
 
-    // 예약 없음/불일치/에러 공통 처리: 세션 정지 후 알림 표시, 확인 시 이전 화면으로 복귀
-    private func showInfoAndPop(title: String, message: String) {
+    // 알림 표시: allowAutoPop == true 일 때만 일정 시간 후 자동 복귀
+    private func showInfoAndPop(title: String, message: String, allowAutoPop: Bool) {
         // ✅ 중복 표시 방지
         if hasPresentedAlert { return }
         hasPresentedAlert = true
@@ -861,29 +861,35 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
 
         DispatchQueue.main.async {
             // 카운트다운/세션/오버레이 정리
-            self.countdownTimer?.invalidate()
-            self.countdownTimer = nil
-            self.countdownLabel?.removeFromSuperview()
-            self.instructionLabel?.removeFromSuperview()
+            self.countdownTimer?.invalidate(); self.countdownTimer = nil
+            self.countdownLabel?.removeFromSuperview(); self.countdownLabel = nil
+            self.instructionLabel?.removeFromSuperview(); self.instructionLabel = nil
             self.arView.session.pause()
             self.arView.removeFromSuperview()
 
-            // 알림 생성 및 "확인" 시 이전 화면으로 복귀
+            // 알림 생성 및 확인 시 이전 화면 복귀
             let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "확인", style: .default, handler: { _ in
                 _ = self.navigationController?.popViewController(animated: true)
             }))
 
-            // 보조 안전장치: 10초 후 자동 복귀
-            DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                if self.presentedViewController === alert {
-                    alert.dismiss(animated: true) {
-                        _ = self.navigationController?.popViewController(animated: true)
+            // 👉 예약 정보 없음 등 특정 케이스에서만 자동 복귀
+            if allowAutoPop {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                    if self.presentedViewController === alert {
+                        alert.dismiss(animated: true) {
+                            _ = self.navigationController?.popViewController(animated: true)
+                        }
                     }
                 }
             }
             self.present(alert, animated: true)
         }
+    }
+
+    // 기존 2-파라미터 호출부 호환용 (기본값: 자동 복귀 없음)
+    private func showInfoAndPop(title: String, message: String) {
+        showInfoAndPop(title: title, message: message, allowAutoPop: false)
     }
 
     // MARK: - Firestore 비교 로직
@@ -919,12 +925,12 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
         query.getDocuments { snapshot, error in
             if let error = error {
                 print("Firestore error: \(error.localizedDescription)")
-                self.showInfoAndPop(title: "에러", message: "예약 정보를 불러올 수 없습니다.\n\(error.localizedDescription)")
+                self.showInfoAndPop(title: "에러", message: "예약 정보를 불러올 수 없습니다.\n\(error.localizedDescription)", allowAutoPop: false)
                 return
             }
             guard let docs = snapshot?.documents, !docs.isEmpty else {
                 // ✅ 후보 문서 자체가 없을 때: 즉시 알림 + 복귀
-                self.showInfoAndPop(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.")
+                self.showInfoAndPop(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.", allowAutoPop: true)
                 return
             }
 
@@ -940,7 +946,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                   let gvLeft  = guestVectors[.left],
                   let gvRight = guestVectors[.right] else {
                 print("→ guestVectors missing one of front/left/right")
-                self.showInfoAndPop(title: "인식 실패", message: "촬영된 얼굴 정보가 올바르지 않습니다. 다시 시도해 주세요.")
+                self.showInfoAndPop(title: "인식 실패", message: "촬영된 얼굴 정보가 올바르지 않습니다. 다시 시도해 주세요.", allowAutoPop: false)
                 return
             }
 
@@ -954,7 +960,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                 return v.isFinite ? v : -1
             }
 
-            let thresholdCos: Float = 0.70 // ✅ 코사인 유사도 임계값
+            let thresholdCos: Float = 0.80 // ✅ 코사인 유사도 임계값
 
             for doc in docs {
                 if self.hasPresentedAlert { return } // 이미 다른 경로로 종료됨
@@ -966,7 +972,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                     print("→ reserveID \(reserveID) has no userID field")
                     processed += 1
                     if processed == total && !matched && !self.hasPresentedAlert {
-                        self.showInfoAndPop(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.")
+                        self.showInfoAndPop(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.", allowAutoPop: true)
                     }
                     continue
                 }
@@ -975,7 +981,7 @@ final class GuestFaceRecognitionViewController: UIViewController, ARSessionDeleg
                     defer {
                         processed += 1
                         if processed == total && !matched && !self.hasPresentedAlert {
-                            self.showInfoAndPop(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.")
+                            self.showInfoAndPop(title: "예약 정보 없음", message: "일치하는 예약 정보가 없습니다.", allowAutoPop: true)
                         }
                     }
 
