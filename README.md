@@ -135,7 +135,7 @@ FaceInn/                            # 레포 루트 (Tuist 프로젝트)
 
 **✅ 결과**
 
-- `MobileFaceNet`을 `paddle2onnx` → `coremltools` 경로로 변환해 번들에 탑재 — 얼굴 원본을 저장하지 않고 `128차원` 벡터만 저장
+- `MobileFaceNet`을 `paddle2onnx` → `coremltools` 경로로 변환해 번들에 탑재 - 얼굴 원본을 저장하지 않고 `128차원` 벡터만 저장
 - `VNCoreMLModel`로 로딩해 기기 안에서 추출 - 네트워크 없이 체크인 인식이 성립
 - `.mlpackage`에서 무한 빌드가 발생해 `.mlmodel`로 교체 - 빌드가 멈추던 경로 제거
 - 모델 경로를 Tuist 매니페스트에 추가 - 프로젝트 생성 시 모델 클래스가 함께 컴파일
@@ -143,8 +143,8 @@ FaceInn/                            # 레포 루트 (Tuist 프로젝트)
 <details>
 <summary>근거</summary>
 
-- 코드 — [`FaceProcessor.swift:15-49`](https://github.com/HunCY5/FaceInn/blob/develop/FaceInn/Sources/FaceId/FaceProcessor.swift#L15-L49)(모델 로딩·임베딩 추출) · [`:52-71`](https://github.com/HunCY5/FaceInn/blob/develop/FaceInn/Sources/FaceId/FaceProcessor.swift#L52-L71)(Vision 검출과 분리) · [`Project.swift:53-59`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/Project.swift#L53-L59)
-- 커밋 — [`c9bc3fa`](https://github.com/HunCY5/FaceInn/commit/c9bc3fa) [`76a85a7`](https://github.com/HunCY5/FaceInn/commit/76a85a7) [`af8a870`](https://github.com/HunCY5/FaceInn/commit/af8a870) [`cc4b090`](https://github.com/HunCY5/FaceInn/commit/cc4b090) [`6482c97`](https://github.com/HunCY5/FaceInn/commit/6482c97)
+- 코드 - [`FaceProcessor.swift:15-49`](https://github.com/HunCY5/FaceInn/blob/develop/FaceInn/Sources/FaceId/FaceProcessor.swift#L15-L49)(모델 로딩·임베딩 추출) · [`:52-71`](https://github.com/HunCY5/FaceInn/blob/develop/FaceInn/Sources/FaceId/FaceProcessor.swift#L52-L71)(Vision 검출과 분리) · [`Project.swift:53-59`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/Project.swift#L53-L59)
+- 커밋 - [`c9bc3fa`](https://github.com/HunCY5/FaceInn/commit/c9bc3fa) [`76a85a7`](https://github.com/HunCY5/FaceInn/commit/76a85a7) [`af8a870`](https://github.com/HunCY5/FaceInn/commit/af8a870) [`cc4b090`](https://github.com/HunCY5/FaceInn/commit/cc4b090) [`6482c97`](https://github.com/HunCY5/FaceInn/commit/6482c97)
 
 </details>
 
@@ -174,8 +174,8 @@ FaceInn/                            # 레포 루트 (Tuist 프로젝트)
 <details>
 <summary>근거</summary>
 
-- 코드 — [`FaceCaptureViewController.swift:254-370`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/FaceId/FaceCaptureViewController.swift#L254-L370)(우측 유도선) · [`:414-540`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/FaceId/FaceCaptureViewController.swift#L414-L540)(좌측 동일 구조) · [`:682-780`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/FaceId/FaceCaptureViewController.swift#L682-L780)(카운트다운·촬영) · [`FaceGuideOverlayView.swift:66-147`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/FaceId/FaceGuideOverlayView.swift#L66-L147)
-- 커밋 — [`af8a870`](https://github.com/HunCY5/FaceInn/commit/af8a870) [`8372f8d`](https://github.com/HunCY5/FaceInn/commit/8372f8d) [`3c8d90d`](https://github.com/HunCY5/FaceInn/commit/3c8d90d) [`dbad867`](https://github.com/HunCY5/FaceInn/commit/dbad867) [`39e0ba5`](https://github.com/HunCY5/FaceInn/commit/39e0ba5) [`88d4088`](https://github.com/HunCY5/FaceInn/commit/88d4088)
+- 코드 - [`FaceCaptureViewController.swift:254-370`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/FaceId/FaceCaptureViewController.swift#L254-L370)(우측 유도선) · [`:414-540`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/FaceId/FaceCaptureViewController.swift#L414-L540)(좌측 동일 구조) · [`:682-780`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/FaceId/FaceCaptureViewController.swift#L682-L780)(카운트다운·촬영) · [`FaceGuideOverlayView.swift:66-147`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/FaceId/FaceGuideOverlayView.swift#L66-L147)
+- 커밋 - [`af8a870`](https://github.com/HunCY5/FaceInn/commit/af8a870) [`8372f8d`](https://github.com/HunCY5/FaceInn/commit/8372f8d) [`3c8d90d`](https://github.com/HunCY5/FaceInn/commit/3c8d90d) [`dbad867`](https://github.com/HunCY5/FaceInn/commit/dbad867) [`39e0ba5`](https://github.com/HunCY5/FaceInn/commit/39e0ba5) [`88d4088`](https://github.com/HunCY5/FaceInn/commit/88d4088)
 
 
 </details>
@@ -206,8 +206,8 @@ FaceInn/                            # 레포 루트 (Tuist 프로젝트)
 <details>
 <summary>근거</summary>
 
-- 코드 — [`GuestFaceRecognitionViewController.swift:815-855`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/HostMainView/CheckIn/GuestFaceRecognitionViewController.swift#L815-L855)(임베딩 추출) · [`:892-916`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/HostMainView/CheckIn/GuestFaceRecognitionViewController.swift#L892-L916)(타입 흡수 변환) · [`:976-986`(코사인·임계값)](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/HostMainView/CheckIn/GuestFaceRecognitionViewController.swift#L976-L986) · `:1031-1047`(3포즈 동시 판정)
-- 커밋 — [`a2a704f`](https://github.com/HunCY5/FaceInn/commit/a2a704f) [`73a30d0`](https://github.com/HunCY5/FaceInn/commit/73a30d0) [`9f6f0e1`](https://github.com/HunCY5/FaceInn/commit/9f6f0e1) [`8e1d6fd`](https://github.com/HunCY5/FaceInn/commit/8e1d6fd) [`6415c52`](https://github.com/HunCY5/FaceInn/commit/6415c52)
+- 코드 - [`GuestFaceRecognitionViewController.swift:815-855`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/HostMainView/CheckIn/GuestFaceRecognitionViewController.swift#L815-L855)(임베딩 추출) · [`:892-916`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/HostMainView/CheckIn/GuestFaceRecognitionViewController.swift#L892-L916)(타입 흡수 변환) · [`:976-986`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/HostMainView/CheckIn/GuestFaceRecognitionViewController.swift#L976-L986)(코사인·임계값) · [`:1031-1047`](https://github.com/HunCY5/FaceInn/blob/ebc1003170e890780d4a6baa735aa362f8956291/FaceInn/Sources/HostMainView/CheckIn/GuestFaceRecognitionViewController.swift#L1031-L1047)(3포즈 동시 판정)
+- 커밋 - [`a2a704f`](https://github.com/HunCY5/FaceInn/commit/a2a704f) [`73a30d0`](https://github.com/HunCY5/FaceInn/commit/73a30d0) [`9f6f0e1`](https://github.com/HunCY5/FaceInn/commit/9f6f0e1) [`8e1d6fd`](https://github.com/HunCY5/FaceInn/commit/8e1d6fd) [`6415c52`](https://github.com/HunCY5/FaceInn/commit/6415c52)
 
 </details>
 
@@ -253,7 +253,7 @@ git rm --cached *.xcworkspace
 
 | 브랜치 | 용도 | 병합 대상 |
 |--------|------|------|
-| `main` | 앱스토어 출시용 | — |
+| `main` | 앱스토어 출시용 | - |
 | `release` | 출시 준비 | `main`, `develop` |
 | `hotfix` | 배포 버전 버그 수정 | `main`, `develop` |
 | `develop` | 개발 완료 | `release` |
